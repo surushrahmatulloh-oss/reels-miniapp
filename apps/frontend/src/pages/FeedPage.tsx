@@ -7,7 +7,7 @@ import { ReelsPlayer } from '@/components/ReelsPlayer';
 import { BottomNav } from '@/components/BottomNav';
 import { LoadingScreen } from '@/components/LoadingScreen';
 
-const APP_VERSION = '2.2.0';
+const APP_VERSION = '2.3.0';
 
 export function FeedPage() {
   useSocket();
@@ -17,6 +17,8 @@ export function FeedPage() {
     const prev = localStorage.getItem('reels_app_version');
     if (prev !== APP_VERSION) {
       localStorage.setItem('reels_app_version', APP_VERSION);
+      useFeedStore.getState().setVideos([]);
+      useFeedStore.getState().setCurrentIndex(0);
       void queryClient.invalidateQueries({ queryKey: ['feed'] });
       void queryClient.invalidateQueries({ queryKey: ['search-videos'] });
       void queryClient.invalidateQueries({ queryKey: ['saved'] });
@@ -34,12 +36,14 @@ export function FeedPage() {
     queryKey: ['feed'],
     queryFn: async () => {
       const data = await getFeed({ limit: 15, format: 'reels' });
-      setVideos(data.videos);
-      setPagination(data.nextCursor, data.hasMore);
+      if (useFeedStore.getState().videos.length === 0) {
+        setVideos(data.videos);
+        setPagination(data.nextCursor, data.hasMore);
+      }
       return data;
     },
-    staleTime: 0,
-    refetchOnMount: 'always',
+    staleTime: 60_000,
+    refetchOnMount: false,
   });
 
   const loadMore = useCallback(async () => {
@@ -49,7 +53,7 @@ export function FeedPage() {
     setPagination(data.nextCursor, data.hasMore);
   }, [hasMore, isFetching, nextCursor, setVideos, setPagination]);
 
-  if (isLoading) {
+  if (isLoading && videos.length === 0) {
     return <LoadingScreen message="Лента бор мешавад..." />;
   }
 

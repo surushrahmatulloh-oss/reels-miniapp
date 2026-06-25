@@ -5,6 +5,7 @@ import { Follow } from '../models/Follow.js';
 import { Like, Save } from '../models/Interaction.js';
 import { Video } from '../models/Video.js';
 import { serializeUser } from '../services/auth.service.js';
+import { enrichVideos } from '../services/feed.service.js';
 import { isFallbackMode } from '../store/fallback.js';
 import * as fb from '../services/fallback.service.js';
 import type { AuthRequest } from '../middleware/auth.js';
@@ -292,18 +293,13 @@ export async function searchVideos(req: AuthRequest, res: Response): Promise<voi
       { caption: { $regex: q, $options: 'i' } },
       { hashtags: { $regex: q, $options: 'i' } },
       { category: { $regex: q, $options: 'i' } },
+      { authorName: { $regex: q, $options: 'i' } },
+      { musicTitle: { $regex: q, $options: 'i' } },
     ],
   })
-    .limit(20)
+    .limit(24)
     .lean();
 
-  res.json({
-    videos: videos.map((v) => ({
-      id: v._id.toString(),
-      thumbnailUrl: v.thumbnailUrl,
-      caption: v.caption,
-      category: v.category,
-      likes: v.likes,
-    })),
-  });
+  const enriched = await enrichVideos(videos, req.user!.userId);
+  res.json({ videos: enriched });
 }

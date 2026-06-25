@@ -57,54 +57,107 @@ const CATEGORIES = [
   'technology', 'animation', 'entertainment', 'education', 'business', 'science',
 ] as const;
 
-/** Танҳо URL-ҳои санҷидашуда — аз Render кор мекунанд */
-const REEL_POOL: Array<{
-  url: string;
-  caption: string;
-  music: string;
-  category: (typeof CATEGORIES)[number];
-  hashtags: string[];
-}> = [
-  { url: 'https://download.samplelib.com/mp4/sample-5s.mp4', caption: 'Мусиқии тренд 🔥', music: 'Trending Beat', category: 'music', hashtags: ['music', 'trend', 'reels', 'viral'] },
-  { url: 'https://download.samplelib.com/mp4/sample-10s.mp4', caption: 'Варзиш ва энергия ⚽', music: 'Sport Vibes', category: 'sport', hashtags: ['sport', 'fitness', 'reels'] },
-  { url: 'https://download.samplelib.com/mp4/sample-15s.mp4', caption: 'Табиати зебо 🌿', music: 'Nature Sounds', category: 'nature', hashtags: ['nature', 'travel', 'fyp'] },
-  { url: 'https://download.samplelib.com/mp4/sample-20s.mp4', caption: 'Ошпазии модерн 🍳', music: 'Kitchen Beats', category: 'food', hashtags: ['food', 'cooking', 'reels'] },
-  { url: 'https://interactive-examples.mdn.mozilla.net/media/cc0-videos/flower.mp4', caption: 'Гулҳои баҳор 🌸', music: 'Soft Piano', category: 'nature', hashtags: ['flowers', 'nature', 'aesthetic'] },
-  { url: 'https://interactive-examples.mdn.mozilla.net/media/cc0-videos/friday.mp4', caption: 'Ҷумъа муборак 🎵', music: 'Friday Mood', category: 'music', hashtags: ['music', 'friday', 'vibes'] },
-  { url: 'https://www.w3schools.com/html/mov_bbb.mp4', caption: 'Анимацияи зебо 🎬', music: 'Fun Mix', category: 'animation', hashtags: ['animation', 'cute', 'reels'] },
-  { url: 'https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/ForBiggerEscapes.mp4', caption: 'Мода ва услуб 👗', music: 'Fashion Week', category: 'fashion', hashtags: ['fashion', 'style', 'ootd'] },
-  { url: 'https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/ForBiggerFun.mp4', caption: 'Хушмазагӣ 🎭', music: 'Party Mix', category: 'entertainment', hashtags: ['fun', 'party', 'viral'] },
-  { url: 'https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/BigBuckBunny.mp4', caption: 'Контенти вирусӣ 🐰', music: 'Viral Sound', category: 'animation', hashtags: ['viral', 'fyp', 'reels'] },
-  { url: 'https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/ElephantsDream.mp4', caption: 'Reels эстетик 🎥', music: 'Dreamy', category: 'entertainment', hashtags: ['aesthetic', 'reels', 'fyp'] },
-  { url: 'https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/ForBiggerJoyrides.mp4', caption: 'Таълим ва илм 📚', music: 'Study Lo-Fi', category: 'education', hashtags: ['education', 'learn', 'tips'] },
+const GCS = 'https://commondatastorage.googleapis.com/gtv-videos-bucket/sample';
+
+/** URL-ҳои санҷидашуда — аз Render кор мекунанд */
+const VIDEO_SOURCES: Array<{ url: string; category: (typeof CATEGORIES)[number] }> = [
+  { url: `${GCS}/ForBiggerBlazes.mp4`, category: 'entertainment' },
+  { url: `${GCS}/ForBiggerEscapes.mp4`, category: 'travel' },
+  { url: `${GCS}/ForBiggerFun.mp4`, category: 'entertainment' },
+  { url: `${GCS}/ForBiggerJoyrides.mp4`, category: 'sport' },
+  { url: `${GCS}/ForBiggerMeltdowns.mp4`, category: 'music' },
+  { url: `${GCS}/Sintel.mp4`, category: 'animation' },
+  { url: `${GCS}/BigBuckBunny.mp4`, category: 'animation' },
+  { url: `${GCS}/ElephantsDream.mp4`, category: 'animation' },
+  { url: `${GCS}/SubaruOutbackOnStreetAndDirt.mp4`, category: 'travel' },
+  { url: `${GCS}/TearsOfSteel.mp4`, category: 'science' },
+  { url: `${GCS}/VolkswagenGTIReview.mp4`, category: 'technology' },
+  { url: `${GCS}/WeAreGoingOnBullrun.mp4`, category: 'travel' },
+  { url: `${GCS}/WhatCarCanYouGetForAGrand.mp4`, category: 'business' },
+  { url: `${GCS}/Bears.mp4`, category: 'nature' },
+  { url: `${GCS}/ChromebookPrize.mp4`, category: 'technology' },
+  { url: 'https://download.samplelib.com/mp4/sample-5s.mp4', category: 'music' },
+  { url: 'https://download.samplelib.com/mp4/sample-10s.mp4', category: 'sport' },
+  { url: 'https://download.samplelib.com/mp4/sample-15s.mp4', category: 'nature' },
+  { url: 'https://download.samplelib.com/mp4/sample-20s.mp4', category: 'food' },
+  { url: 'https://download.samplelib.com/mp4/sample-30s.mp4', category: 'fashion' },
+  { url: 'https://interactive-examples.mdn.mozilla.net/media/cc0-videos/flower.mp4', category: 'nature' },
+  { url: 'https://interactive-examples.mdn.mozilla.net/media/cc0-videos/friday.mp4', category: 'music' },
+  { url: 'https://filesamples.com/samples/video/mp4/sample_640x360.mp4', category: 'education' },
+  { url: 'https://filesamples.com/samples/video/mp4/sample_960x540.mp4', category: 'food' },
+  { url: 'https://filesamples.com/samples/video/mp4/sample_1280x720.mp4', category: 'fashion' },
+  { url: 'https://filesamples.com/samples/video/mp4/sample_1920x1080.mp4', category: 'entertainment' },
+  { url: 'https://filesamples.com/samples/video/mp4/sample_960x400_ocean_with_audio.mp4', category: 'travel' },
 ];
 
-const seenUrls = new Set<string>();
-const uniquePool = REEL_POOL.filter((item) => {
-  if (seenUrls.has(item.url)) return false;
-  seenUrls.add(item.url);
-  return true;
-});
+const CAPTIONS: Record<string, string[]> = {
+  music: ['🔥 Trending sound', '🎵 Мусиқии нав', '💿 Хитҳои имрӯза', '🎤 Reels мусиқӣ'],
+  sport: ['⚽ Goals only', '💪 Fitness vibes', '🏃 Workout mode', '🔥 Sport energy'],
+  nature: ['🌿 Табиати зебо', '🌸 Bahor vibes', '🏔️ Travel mood', '🌊 Ocean calm'],
+  food: ['🍳 Recipe reel', '😋 Food porn', '👨‍🍳 Quick cook', '🍕 Yummy content'],
+  travel: ['✈️ Wanderlust', '🌍 Explore more', '📍 Hidden gems', '🛫 Travel diary'],
+  fashion: ['👗 OOTD', '✨ Style inspo', '💄 Beauty reel', '👠 Fashion week'],
+  technology: ['📱 Tech review', '💻 Gadget life', '🤖 AI trends', '⚡ New tech'],
+  animation: ['🎬 Animation reel', '🐰 Cute vibes', '✨ 3D art', '🎨 Creative'],
+  entertainment: ['😂 Viral moment', '🎭 Fun content', '🔥 FYP material', '⭐ Must watch'],
+  education: ['📚 Learn fast', '💡 Life hack', '🧠 Smart tips', '📖 Study reel'],
+  business: ['💼 Business tips', '📈 Growth hack', '🚀 Startup life', '💰 Money moves'],
+  science: ['🔬 Science facts', '🌌 Space vibes', '🧪 Experiment', '⚗️ Discovery'],
+};
 
-export const videos: MemoryVideo[] = uniquePool.map((item, idx) => ({
-  id: `vid_${idx + 1}`,
-  instagramId: `ig_${idx + 1}`,
-  url: item.url,
-  thumbnailUrl: '',
-  format: 'reels' as VideoFormat,
-  category: item.category,
-  hashtags: item.hashtags,
-  caption: `${item.caption} #${item.category}`,
-  authorName: `@creator_${(idx % 12) + 1}`,
-  authorAvatar: `https://i.pravatar.cc/150?u=creator${idx % 12}`,
-  musicTitle: item.music,
-  likes: 2400 + idx * 137,
-  views: 22000 + idx * 503,
-  commentsCount: 55 + idx * 7,
-  sharesCount: 22 + idx * 3,
-  savesCount: 88 + idx * 5,
-  createdAt: new Date(Date.now() - idx * 3600000),
-}));
+const MUSIC = [
+  'Original Sound', 'Trending Beat', 'Viral Audio', 'Reels Mix',
+  'Night Vibes', 'Summer Hit', 'Lo-Fi Study', 'Dance Floor',
+];
+
+const CREATOR_NAMES = [
+  '@dilnoza_reels', '@tajik_creator', '@reels_tj', '@viral_dushanbe',
+  '@music_hub_tj', '@sport_life_tj', '@foodie_tj', '@travel_tj',
+  '@fashion_tj', '@tech_tj', '@fun_clips_tj', '@learn_fast_tj',
+  '@nature_lover', '@dance_tj', '@comedy_tj', '@aesthetic_tj',
+  '@daily_reels', '@trend_watch', '@clip_master', '@reels_pro',
+];
+
+function buildCatalog(): MemoryVideo[] {
+  const seenUrls = new Set<string>();
+  const list: MemoryVideo[] = [];
+
+  for (const src of VIDEO_SOURCES) {
+    if (seenUrls.has(src.url)) continue;
+    seenUrls.add(src.url);
+
+    const idx = list.length;
+    const cat = src.category;
+    const captions = CAPTIONS[cat] ?? CAPTIONS.entertainment!;
+    const caption = captions[idx % captions.length]!;
+    const creator = CREATOR_NAMES[idx % CREATOR_NAMES.length]!;
+    const id = `vid_${idx + 1}`;
+
+    list.push({
+      id,
+      instagramId: `ig_${idx + 1}`,
+      url: src.url,
+      thumbnailUrl: `https://picsum.photos/seed/reel${id}/720/1280`,
+      format: 'reels',
+      category: cat,
+      hashtags: [cat, 'reels', 'fyp', 'viral', 'tajikistan'],
+      caption: `${caption} #${cat} #reels #fyp`,
+      authorName: creator,
+      authorAvatar: `https://i.pravatar.cc/150?u=${encodeURIComponent(creator)}`,
+      musicTitle: MUSIC[idx % MUSIC.length]!,
+      likes: 1200 + idx * 89 + ((idx * 17) % 500),
+      views: 8000 + idx * 311 + ((idx * 23) % 2000),
+      commentsCount: 30 + idx * 4,
+      sharesCount: 15 + idx * 2,
+      savesCount: 40 + idx * 3,
+      createdAt: new Date(Date.now() - idx * 1800000),
+    });
+  }
+
+  return list;
+}
+
+export const videos: MemoryVideo[] = buildCatalog();
 
 export function getVideoById(videoId: string): MemoryVideo | undefined {
   return videos.find((v) => v.id === videoId);

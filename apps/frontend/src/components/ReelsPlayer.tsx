@@ -16,6 +16,7 @@ interface ReelsPlayerProps {
   videos: Video[];
   onLoadMore?: () => void;
   startIndex?: number;
+  controlledIndex?: number;
   onIndexChange?: (index: number) => void;
 }
 
@@ -44,7 +45,13 @@ async function tryPlay(video: HTMLVideoElement, muted: boolean): Promise<boolean
   }
 }
 
-export function ReelsPlayer({ videos, onLoadMore, startIndex = 0, onIndexChange }: ReelsPlayerProps) {
+export function ReelsPlayer({
+  videos,
+  onLoadMore,
+  startIndex = 0,
+  controlledIndex,
+  onIndexChange,
+}: ReelsPlayerProps) {
   const containerRef = useRef<HTMLDivElement>(null);
   const videoRefs = useRef<Map<number, HTMLVideoElement>>(new Map());
   const lastTapRef = useRef(0);
@@ -53,9 +60,11 @@ export function ReelsPlayer({ videos, onLoadMore, startIndex = 0, onIndexChange 
   const [playingIndex, setPlayingIndex] = useState<number | null>(null);
   const [needsTap, setNeedsTap] = useState(false);
 
-  const currentIndex = useFeedStore((s) => s.currentIndex);
+  const storeIndex = useFeedStore((s) => s.currentIndex);
+  const setStoreIndex = useFeedStore((s) => s.setCurrentIndex);
+  const currentIndex = controlledIndex ?? storeIndex;
+  const setCurrentIndex = onIndexChange ?? setStoreIndex;
   const isMuted = useFeedStore((s) => s.isMuted);
-  const setCurrentIndex = useFeedStore((s) => s.setCurrentIndex);
   const updateVideo = useFeedStore((s) => s.updateVideo);
   const toggleMute = useFeedStore((s) => s.toggleMute);
 
@@ -91,13 +100,17 @@ export function ReelsPlayer({ videos, onLoadMore, startIndex = 0, onIndexChange 
   useEffect(() => {
     void playVideo(currentIndex);
     const video = videos[currentIndex];
-    if (video) {
+    if (!video) return;
+
+    const timer = window.setTimeout(() => {
       void markVideoViewed(video.id);
-    }
+    }, 2000);
 
     if (currentIndex >= videos.length - 3 && onLoadMore) {
       onLoadMore();
     }
+
+    return () => window.clearTimeout(timer);
   }, [currentIndex, videos, playVideo, onLoadMore]);
 
   useEffect(() => {
@@ -228,6 +241,7 @@ export function ReelsPlayer({ videos, onLoadMore, startIndex = 0, onIndexChange 
                 if (el) videoRefs.current.set(index, el);
               }}
               src={getPlayableUrl(video)}
+              poster={video.thumbnailUrl || undefined}
               className="h-full w-full object-cover"
               loop
               playsInline

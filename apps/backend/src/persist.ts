@@ -1,7 +1,7 @@
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'fs';
 import path from 'path';
 import { fileURLToPath } from 'url';
-import { users, likes, saves, isFallbackMode } from './store/fallback.js';
+import { users, likes, saves, views, isFallbackMode } from './store/fallback.js';
 import type { MemoryUser } from './store/fallback.js';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
@@ -12,6 +12,7 @@ interface PersistedData {
   users: MemoryUser[];
   likes: string[];
   saves: string[];
+  views?: string[];
 }
 
 export function loadPersistedStore(): void {
@@ -25,6 +26,7 @@ export function loadPersistedStore(): void {
     }
     for (const l of data.likes ?? []) likes.add(l);
     for (const s of data.saves ?? []) saves.add(s);
+    for (const v of data.views ?? []) views.add(v);
     console.log(`Loaded ${data.users.length} users from disk`);
   } catch (err) {
     console.warn('Could not load persisted store:', (err as Error).message);
@@ -43,6 +45,7 @@ export function savePersistedStore(): void {
       })),
       likes: [...likes],
       saves: [...saves],
+      views: [...views],
     };
     writeFileSync(DATA_FILE, JSON.stringify(payload, null, 2), 'utf8');
   } catch (err) {

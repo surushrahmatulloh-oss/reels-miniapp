@@ -1,4 +1,4 @@
-import { useEffect, useRef } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import type { Video } from '@/types';
 import { getPlayableUrl } from '@/utils/video';
 
@@ -25,7 +25,10 @@ interface VideoGridTileProps {
 export function VideoGridTile({ video, onClick }: VideoGridTileProps) {
   const videoRef = useRef<HTMLVideoElement>(null);
   const rootRef = useRef<HTMLButtonElement>(null);
+  const [isPlaying, setIsPlaying] = useState(false);
+  const [videoFailed, setVideoFailed] = useState(false);
   const gradient = CATEGORY_GRADIENT[video.category] ?? 'from-gray-900 to-gray-700';
+  const poster = video.thumbnailUrl || undefined;
 
   useEffect(() => {
     const el = rootRef.current;
@@ -35,13 +38,14 @@ export function VideoGridTile({ video, onClick }: VideoGridTileProps) {
     const observer = new IntersectionObserver(
       ([entry]) => {
         if (entry?.isIntersecting) {
-          void vid.play().catch(() => undefined);
+          void vid.play().then(() => setIsPlaying(true)).catch(() => setVideoFailed(true));
         } else {
           vid.pause();
           vid.currentTime = 0;
+          setIsPlaying(false);
         }
       },
-      { threshold: 0.4 },
+      { threshold: 0.35 },
     );
     observer.observe(el);
     return () => observer.disconnect();
@@ -54,20 +58,32 @@ export function VideoGridTile({ video, onClick }: VideoGridTileProps) {
       onClick={onClick}
       className={`group relative aspect-[9/16] w-full overflow-hidden rounded-xl bg-gradient-to-br ${gradient} text-left`}
     >
-      <video
-        ref={videoRef}
-        src={getPlayableUrl(video)}
-        muted
-        playsInline
-        loop
-        autoPlay
-        preload="auto"
-        className="pointer-events-none absolute inset-0 h-full w-full object-cover"
-      />
-      <div className="pointer-events-none absolute inset-0 bg-gradient-to-t from-black/80 via-transparent to-black/20" />
-      <div className="pointer-events-none absolute inset-0 flex items-center justify-center">
-        <span className="rounded-full bg-black/40 px-3 py-1.5 text-base backdrop-blur-sm">▶</span>
-      </div>
+      {videoFailed && poster ? (
+        <img
+          src={poster}
+          alt=""
+          className="pointer-events-none absolute inset-0 h-full w-full object-cover"
+        />
+      ) : (
+        <video
+          ref={videoRef}
+          src={getPlayableUrl(video)}
+          poster={poster}
+          muted
+          playsInline
+          loop
+          preload="metadata"
+          className="pointer-events-none absolute inset-0 h-full w-full object-cover"
+          onPlaying={() => setIsPlaying(true)}
+          onError={() => setVideoFailed(true)}
+        />
+      )}
+      <div className="pointer-events-none absolute inset-0 bg-gradient-to-t from-black/70 via-transparent to-transparent" />
+      {!isPlaying && !videoFailed && (
+        <div className="pointer-events-none absolute inset-0 flex items-center justify-center">
+          <span className="rounded-full bg-black/40 px-3 py-1.5 text-base backdrop-blur-sm">▶</span>
+        </div>
+      )}
       <p className="pointer-events-none absolute bottom-2 left-2 right-2 line-clamp-2 text-xs font-medium drop-shadow">
         {video.caption}
       </p>

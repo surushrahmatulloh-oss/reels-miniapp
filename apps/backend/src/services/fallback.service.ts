@@ -10,13 +10,33 @@ import {
   comments,
   key,
   clearUserViews,
-  dedupeByUrl,
-  shuffleVideos,
   getVideoById,
+  shuffleVideos,
   type MemoryUser,
   type MemoryVideo,
 } from '../store/fallback.js';
 import { savePersistedStore } from '../persist.js';
+
+/** Stable feed order per user — pagination without re-shuffle */
+const feedOrders = new Map<string, string[]>();
+
+function getUserFeedOrder(userId: string, preferred: string[]): string[] {
+  const existing = feedOrders.get(userId);
+  if (existing && existing.length === videos.length) return existing;
+
+  let ordered = [...videos];
+  if (preferred.length > 0) {
+    const pref = ordered.filter((v) => preferred.includes(v.category));
+    const rest = ordered.filter((v) => !preferred.includes(v.category));
+    ordered = [...shuffleVideos(pref), ...shuffleVideos(rest)];
+  } else {
+    ordered = shuffleVideos(ordered);
+  }
+
+  const ids = ordered.map((v) => v.id);
+  feedOrders.set(userId, ids);
+  return ids;
+}
 
 function serializeMemoryUser(user: MemoryUser) {
   return {
@@ -146,7 +166,7 @@ function enrichVideo(v: MemoryVideo, userId: string) {
     id: v.id,
     instagramId: v.instagramId,
     url: publicVideoUrl(v.id),
-    thumbnailUrl: v.thumbnailUrl,
+    thumbnailUrl: v.thumbnailUrl || `https://picsum.photos/seed/reel${v.id}/720/1280`,
     format: v.format,
     category: v.category,
     hashtags: v.hashtags,
@@ -179,45 +199,37 @@ function matchesQuery(v: MemoryVideo, q: string): boolean {
 export function fallbackGetFeed(userId: string, limit = 10, cursor?: string) {
   const user = users.get(userId);
   const preferred = user?.preferences.categories ?? [];
-  let list = dedupeByUrl([...videos]);
+  const order = getUserFeedOrder(userId, preferred);
 
-  if (preferred.length > 0) {
-    const preferredVideos = list.filter((v) => preferred.includes(v.category));
-    const otherVideos = list.filter((v) => !preferred.includes(v.category));
-    list = [...preferredVideos, ...otherVideos];
-  }
+  let unseenIds = order.filter((id) => !views.has(key(userId, id)));
 
-  list = list.filter((v) => !views.has(key(userId, v.id)));
-
-  if (list.length < limit) {
+  if (unseenIds.length < limit) {
     clearUserViews(userId);
-    list = dedupeByUrl([...videos]);
-    if (preferred.length > 0) {
-      const preferredVideos = list.filter((v) => preferred.includes(v.category));
-      const otherVideos = list.filter((v) => !preferred.includes(v.category));
-      list = [...preferredVideos, ...otherVideos];
-    }
+    unseenIds = [...order];
   }
 
-  list = shuffleVideos(list);
-
+  let start = 0;
   if (cursor) {
-    const idx = list.findIndex((v) => v.id === cursor);
-    if (idx >= 0) list = list.slice(idx + 1);
+    const idx = unseenIds.indexOf(cursor);
+    start = idx >= 0 ? idx + 1 : 0;
   }
 
-  const page = list.slice(0, limit);
+  const pageIds = unseenIds.slice(start, start + limit);
+  const page = pageIds
+    .map((id) => getVideoById(id))
+    .filter((v): v is MemoryVideo => Boolean(v));
   const enriched = page.map((v) => enrichVideo(v, userId));
 
   return {
     videos: enriched,
     nextCursor: page.length > 0 ? page[page.length - 1]!.id : null,
-    hasMore: list.length > limit,
+    hasMore: start + limit < unseenIds.length,
   };
 }
 
 export function fallbackMarkViewed(userId: string, videoId: string) {
   views.add(key(userId, videoId));
+  savePersistedStore();
 }
 
 export function fallbackLike(userId: string, videoId: string) {
@@ -328,7 +340,8 @@ export function fallbackSearchUsers(q: string) {
 }
 
 export function fallbackSearchVideos(q: string, userId?: string) {
-  return dedupeByUrl(videos.filter((v) => matchesQuery(v, q)))
+  return videos
+    .filter((v) => matchesQuery(v, q))
     .slice(0, 24)
     .map((v) => enrichVideo(v, userId ?? 'guest'));
 }

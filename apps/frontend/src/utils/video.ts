@@ -1,16 +1,18 @@
 import type { Video } from '@/types';
 
 export function getPlayableUrl(video: Pick<Video, 'id' | 'url'>): string {
-  if (video.url.includes('/api/media/')) return video.url;
+  const url = video.url ?? '';
+  if (url.includes('/api/media/')) return url;
   return `/api/media/${video.id}.mp4`;
 }
 
-export function toVideo(partial: Partial<Video> & { id: string; url: string }): Video {
+export function toVideo(partial: Partial<Video> & { id: string }): Video {
+  const url = partial.url ?? `/api/media/${partial.id}.mp4`;
   return {
     id: partial.id,
     instagramId: partial.instagramId ?? partial.id,
-    url: partial.url,
-    thumbnailUrl: partial.thumbnailUrl ?? '',
+    url,
+    thumbnailUrl: partial.thumbnailUrl ?? `https://picsum.photos/seed/reel${partial.id}/720/1280`,
     format: partial.format ?? 'reels',
     category: partial.category ?? 'entertainment',
     hashtags: partial.hashtags ?? [],
@@ -29,11 +31,16 @@ export function toVideo(partial: Partial<Video> & { id: string; url: string }): 
   };
 }
 
-export function dedupeVideosByUrl(videos: Video[]): Video[] {
+export function dedupeVideosById(videos: Video[]): Video[] {
   const seen = new Set<string>();
   return videos.filter((v) => {
-    if (seen.has(v.url)) return false;
-    seen.add(v.url);
+    if (seen.has(v.id)) return false;
+    seen.add(v.id);
     return true;
   });
+}
+
+/** @deprecated use dedupeVideosById */
+export function dedupeVideosByUrl(videos: Video[]): Video[] {
+  return dedupeVideosById(videos);
 }

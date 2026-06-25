@@ -2,7 +2,7 @@ import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
 import type { User, Video } from '@/types';
 import { setAuthToken } from '@/api/client';
-import { dedupeVideosByUrl } from '@/utils/video';
+import { dedupeVideosById } from '@/utils/video';
 
 interface AuthState {
   token: string | null;
@@ -51,6 +51,7 @@ interface FeedState {
   playbackIndex: number;
   setVideos: (videos: Video[], append?: boolean) => void;
   setCurrentIndex: (index: number) => void;
+  setPlaybackIndex: (index: number) => void;
   setPagination: (nextCursor: string | null, hasMore: boolean) => void;
   updateVideo: (id: string, patch: Partial<Video>) => void;
   toggleMute: () => void;
@@ -70,9 +71,10 @@ export const useFeedStore = create<FeedState>((set, get) => ({
   setVideos: (videos, append = false) =>
     set((state) => {
       const merged = append ? [...state.videos, ...videos] : videos;
-      return { videos: dedupeVideosByUrl(merged) };
+      return { videos: dedupeVideosById(merged) };
     }),
   setCurrentIndex: (index) => set({ currentIndex: index }),
+  setPlaybackIndex: (index) => set({ playbackIndex: index }),
   setPagination: (nextCursor, hasMore) => set({ nextCursor, hasMore }),
   updateVideo: (id, patch) =>
     set((state) => ({
@@ -87,9 +89,8 @@ export const useFeedStore = create<FeedState>((set, get) => ({
     window.Telegram?.WebApp?.expand?.();
     set({
       playbackOpen: true,
-      playbackVideos: dedupeVideosByUrl(playbackVideos),
+      playbackVideos: dedupeVideosById(playbackVideos),
       playbackIndex: startIndex,
-      currentIndex: startIndex,
     });
   },
   closePlayback: () =>

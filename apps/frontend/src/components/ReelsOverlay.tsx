@@ -7,7 +7,7 @@ export function ReelsOverlay() {
   const playbackVideos = useFeedStore((s) => s.playbackVideos);
   const playbackIndex = useFeedStore((s) => s.playbackIndex);
   const closePlayback = useFeedStore((s) => s.closePlayback);
-  const setCurrentIndex = useFeedStore((s) => s.setCurrentIndex);
+  const setPlaybackIndex = useFeedStore((s) => s.setPlaybackIndex);
 
   if (!playbackOpen || playbackVideos.length === 0) return null;
 
@@ -24,7 +24,8 @@ export function ReelsOverlay() {
       <ReelsPlayer
         videos={playbackVideos}
         startIndex={playbackIndex}
-        onIndexChange={setCurrentIndex}
+        controlledIndex={playbackIndex}
+        onIndexChange={setPlaybackIndex}
       />
     </div>,
     document.body,
