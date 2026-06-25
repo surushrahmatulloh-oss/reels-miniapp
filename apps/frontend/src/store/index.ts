@@ -2,6 +2,7 @@ import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
 import type { User, Video } from '@/types';
 import { setAuthToken } from '@/api/client';
+import { dedupeVideosByUrl } from '@/utils/video';
 
 interface AuthState {
   token: string | null;
@@ -45,11 +46,16 @@ interface FeedState {
   nextCursor: string | null;
   hasMore: boolean;
   isMuted: boolean;
+  playbackOpen: boolean;
+  playbackVideos: Video[];
+  playbackIndex: number;
   setVideos: (videos: Video[], append?: boolean) => void;
   setCurrentIndex: (index: number) => void;
   setPagination: (nextCursor: string | null, hasMore: boolean) => void;
   updateVideo: (id: string, patch: Partial<Video>) => void;
   toggleMute: () => void;
+  openPlayback: (videos: Video[], startIndex?: number) => void;
+  closePlayback: () => void;
 }
 
 export const useFeedStore = create<FeedState>((set, get) => ({
@@ -58,17 +64,37 @@ export const useFeedStore = create<FeedState>((set, get) => ({
   nextCursor: null,
   hasMore: true,
   isMuted: true,
+  playbackOpen: false,
+  playbackVideos: [],
+  playbackIndex: 0,
   setVideos: (videos, append = false) =>
-    set((state) => ({
-      videos: append ? [...state.videos, ...videos] : videos,
-    })),
+    set((state) => {
+      const merged = append ? [...state.videos, ...videos] : videos;
+      return { videos: dedupeVideosByUrl(merged) };
+    }),
   setCurrentIndex: (index) => set({ currentIndex: index }),
   setPagination: (nextCursor, hasMore) => set({ nextCursor, hasMore }),
   updateVideo: (id, patch) =>
     set((state) => ({
       videos: state.videos.map((v) => (v.id === id ? { ...v, ...patch } : v)),
+      playbackVideos: state.playbackVideos.map((v) =>
+        v.id === id ? { ...v, ...patch } : v,
+      ),
     })),
   toggleMute: () => set((state) => ({ isMuted: !state.isMuted })),
+  openPlayback: (playbackVideos, startIndex = 0) =>
+    set({
+      playbackOpen: true,
+      playbackVideos: dedupeVideosByUrl(playbackVideos),
+      playbackIndex: startIndex,
+      currentIndex: startIndex,
+    }),
+  closePlayback: () =>
+    set({
+      playbackOpen: false,
+      playbackVideos: [],
+      playbackIndex: 0,
+    }),
 }));
 
 interface OnboardingState {

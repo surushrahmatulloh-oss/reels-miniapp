@@ -14,6 +14,8 @@ import { CommentsSheet } from './CommentsSheet';
 interface ReelsPlayerProps {
   videos: Video[];
   onLoadMore?: () => void;
+  startIndex?: number;
+  onIndexChange?: (index: number) => void;
 }
 
 function formatCount(n: number): string {
@@ -41,7 +43,7 @@ async function tryPlay(video: HTMLVideoElement, muted: boolean): Promise<boolean
   }
 }
 
-export function ReelsPlayer({ videos, onLoadMore }: ReelsPlayerProps) {
+export function ReelsPlayer({ videos, onLoadMore, startIndex = 0, onIndexChange }: ReelsPlayerProps) {
   const containerRef = useRef<HTMLDivElement>(null);
   const videoRefs = useRef<Map<number, HTMLVideoElement>>(new Map());
   const lastTapRef = useRef(0);
@@ -55,6 +57,16 @@ export function ReelsPlayer({ videos, onLoadMore }: ReelsPlayerProps) {
   const setCurrentIndex = useFeedStore((s) => s.setCurrentIndex);
   const updateVideo = useFeedStore((s) => s.updateVideo);
   const toggleMute = useFeedStore((s) => s.toggleMute);
+
+  useEffect(() => {
+    if (startIndex > 0) {
+      setCurrentIndex(startIndex);
+      const container = containerRef.current;
+      if (container) {
+        container.scrollTop = startIndex * container.clientHeight;
+      }
+    }
+  }, [startIndex, setCurrentIndex]);
 
   const currentVideo = videos[currentIndex];
 
@@ -112,6 +124,7 @@ export function ReelsPlayer({ videos, onLoadMore }: ReelsPlayerProps) {
     const index = Math.round(container.scrollTop / container.clientHeight);
     if (index !== currentIndex && index >= 0 && index < videos.length) {
       setCurrentIndex(index);
+      onIndexChange?.(index);
     }
   };
 

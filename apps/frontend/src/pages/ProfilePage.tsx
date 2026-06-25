@@ -8,9 +8,13 @@ import {
   updatePreferences,
 } from '@/api/client';
 import { useAuthStore } from '@/store';
+import { useFeedStore } from '@/store';
 import { CATEGORIES, FORMATS } from '@/types';
 import { BottomNav } from '@/components/BottomNav';
 import { LoadingScreen } from '@/components/LoadingScreen';
+import { VideoGridTile } from '@/components/VideoGridTile';
+import { toVideo } from '@/utils/video';
+import type { Video } from '@/types';
 
 type Tab = 'saved' | 'liked' | 'settings';
 
@@ -25,6 +29,7 @@ export function ProfilePage() {
   const [saveError, setSaveError] = useState('');
   const queryClient = useQueryClient();
   const logout = useAuthStore((s) => s.logout);
+  const openPlayback = useFeedStore((s) => s.openPlayback);
 
   const { isLoading, error: meError } = useQuery({
     queryKey: ['me'],
@@ -74,7 +79,13 @@ export function ProfilePage() {
     return <LoadingScreen />;
   }
 
-  const gridVideos = tab === 'saved' ? savedVideos : likedVideos;
+  const gridVideos: Video[] = (tab === 'saved' ? savedVideos : likedVideos).map((v) =>
+    toVideo(v),
+  );
+
+  const openVideo = (index: number) => {
+    if (gridVideos.length > 0) openPlayback(gridVideos, index);
+  };
 
   return (
     <div className="flex h-full flex-col overflow-y-auto pb-20">
@@ -162,11 +173,12 @@ export function ProfilePage() {
           {gridVideos.length === 0 && (
             <p className="col-span-3 py-12 text-center text-sm text-white/50">Холӣ</p>
           )}
-          {gridVideos.map((video) => (
-            <div key={video.id} className="relative aspect-[9/16] bg-white/5">
-              <img src={video.thumbnailUrl} alt="" className="h-full w-full object-cover" />
-              <span className="absolute bottom-1 left-1 text-xs">❤️ {video.likes}</span>
-            </div>
+          {gridVideos.map((video, index) => (
+            <VideoGridTile
+              key={video.id}
+              video={video}
+              onClick={() => openVideo(index)}
+            />
           ))}
         </div>
       )}

@@ -9,6 +9,7 @@ import { OnboardingPage } from '@/pages/OnboardingPage';
 import { FeedPage } from '@/pages/FeedPage';
 import { ProfilePage } from '@/pages/ProfilePage';
 import { SearchPage } from '@/pages/SearchPage';
+import { ReelsOverlay } from '@/components/ReelsOverlay';
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -85,6 +86,7 @@ export default function App() {
       <BrowserRouter>
         <div className="h-full">
           <AppRoutes />
+          <ReelsOverlay />
         </div>
       </BrowserRouter>
     </QueryClientProvider>

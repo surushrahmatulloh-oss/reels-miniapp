@@ -1,11 +1,16 @@
 import { useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { searchUsers, searchVideos } from '@/api/client';
+import { useFeedStore } from '@/store';
 import { BottomNav } from '@/components/BottomNav';
+import { VideoGridTile } from '@/components/VideoGridTile';
+import { toVideo } from '@/utils/video';
+import type { Video } from '@/types';
 
 export function SearchPage() {
   const [query, setQuery] = useState('');
   const [debounced, setDebounced] = useState('');
+  const openPlayback = useFeedStore((s) => s.openPlayback);
 
   const handleSearch = (value: string) => {
     setQuery(value);
@@ -28,13 +33,19 @@ export function SearchPage() {
     enabled: debounced.length >= 2,
   });
 
+  const videoList: Video[] = videos.map((v) => toVideo(v));
+
+  const openVideo = (index: number) => {
+    openPlayback(videoList, index);
+  };
+
   return (
     <div className="flex h-full flex-col pb-20">
       <div className="px-4 pt-4">
         <input
           value={query}
           onChange={(e) => handleSearch(e.target.value)}
-          placeholder="Ҷустуҷӯи корбар ё видё..."
+          placeholder="Ҷустуҷӯ: мусиқӣ, sport, travel..."
           className="w-full rounded-xl bg-white/10 px-4 py-3 outline-none placeholder:text-white/40"
           autoFocus
         />
@@ -43,7 +54,7 @@ export function SearchPage() {
       <div className="flex-1 overflow-y-auto px-4 py-4">
         {debounced.length < 2 && (
           <p className="py-8 text-center text-sm text-white/50">
-            Ҳадди ақал 2 ҳарф нависед
+            Ҳадди ақал 2 ҳарф нависед (категория, hashtag, ном)
           </p>
         )}
 
@@ -66,21 +77,22 @@ export function SearchPage() {
           </section>
         )}
 
-        {videos.length > 0 && (
+        {videoList.length > 0 && (
           <section>
             <h2 className="mb-3 text-sm font-semibold text-white/60">Видёҳо</h2>
             <div className="grid grid-cols-2 gap-2">
-              {videos.map((v) => (
-                <div key={v.id} className="overflow-hidden rounded-xl bg-white/5">
-                  <img src={v.thumbnailUrl} alt="" className="aspect-[9/16] w-full object-cover" />
-                  <p className="truncate p-2 text-xs">{v.caption}</p>
-                </div>
+              {videoList.map((video, index) => (
+                <VideoGridTile
+                  key={video.id}
+                  video={video}
+                  onClick={() => openVideo(index)}
+                />
               ))}
             </div>
           </section>
         )}
 
-        {debounced.length >= 2 && users.length === 0 && videos.length === 0 && (
+        {debounced.length >= 2 && users.length === 0 && videoList.length === 0 && (
           <p className="py-8 text-center text-sm text-white/50">Натиҷа ёфт нашуд</p>
         )}
       </div>

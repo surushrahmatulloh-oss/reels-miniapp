@@ -283,7 +283,7 @@ export async function searchVideos(req: AuthRequest, res: Response): Promise<voi
   }
 
   if (isFallbackMode()) {
-    res.json({ videos: fb.fallbackSearchVideos(q) });
+    res.json({ videos: fb.fallbackSearchVideos(q, req.user!.userId) });
     return;
   }
 

@@ -1,0 +1,4 @@
+1. https://dashboard.render.com/select-repo?type=blueprint
+2. Repo: surushrahmatulloh-oss/reels-miniapp
+3. TELEGRAM_BOT_TOKEN аз .env
+4. node setup-bot.js https://reels-miniapp.onrender.com

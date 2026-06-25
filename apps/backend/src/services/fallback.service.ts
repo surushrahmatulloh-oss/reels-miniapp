@@ -10,7 +10,11 @@ import {
   comments,
   key,
   clearUserViews,
+  dedupeByUrl,
+  shuffleVideos,
+  getVideoById,
   type MemoryUser,
+  type MemoryVideo,
 } from '../store/fallback.js';
 import { savePersistedStore } from '../persist.js';
 
@@ -133,10 +137,45 @@ export function fallbackUpdatePreferences(
   return serializeMemoryUser(user);
 }
 
+function enrichVideo(v: MemoryVideo, userId: string) {
+  return {
+    id: v.id,
+    instagramId: v.instagramId,
+    url: v.url,
+    thumbnailUrl: v.thumbnailUrl,
+    format: v.format,
+    category: v.category,
+    hashtags: v.hashtags,
+    caption: v.caption,
+    authorName: v.authorName,
+    authorAvatar: v.authorAvatar,
+    musicTitle: v.musicTitle,
+    likes: v.likes,
+    views: v.views,
+    commentsCount: v.commentsCount,
+    sharesCount: v.sharesCount,
+    savesCount: v.savesCount,
+    createdAt: v.createdAt.toISOString(),
+    isLiked: likes.has(key(userId, v.id)),
+    isSaved: saves.has(key(userId, v.id)),
+  };
+}
+
+function matchesQuery(v: MemoryVideo, q: string): boolean {
+  const lower = q.toLowerCase();
+  return (
+    v.caption.toLowerCase().includes(lower) ||
+    v.category.toLowerCase().includes(lower) ||
+    v.authorName.toLowerCase().includes(lower) ||
+    v.musicTitle.toLowerCase().includes(lower) ||
+    v.hashtags.some((h) => h.toLowerCase().includes(lower))
+  );
+}
+
 export function fallbackGetFeed(userId: string, limit = 10, cursor?: string) {
   const user = users.get(userId);
   const preferred = user?.preferences.categories ?? [];
-  let list = [...videos];
+  let list = dedupeByUrl([...videos]);
 
   if (preferred.length > 0) {
     const preferredVideos = list.filter((v) => preferred.includes(v.category));
@@ -146,9 +185,9 @@ export function fallbackGetFeed(userId: string, limit = 10, cursor?: string) {
 
   list = list.filter((v) => !views.has(key(userId, v.id)));
 
-  if (list.length === 0) {
+  if (list.length < limit) {
     clearUserViews(userId);
-    list = [...videos];
+    list = dedupeByUrl([...videos]);
     if (preferred.length > 0) {
       const preferredVideos = list.filter((v) => preferred.includes(v.category));
       const otherVideos = list.filter((v) => !preferred.includes(v.category));
@@ -156,7 +195,7 @@ export function fallbackGetFeed(userId: string, limit = 10, cursor?: string) {
     }
   }
 
-  list.sort(() => Math.random() - 0.5);
+  list = shuffleVideos(list);
 
   if (cursor) {
     const idx = list.findIndex((v) => v.id === cursor);
@@ -164,11 +203,7 @@ export function fallbackGetFeed(userId: string, limit = 10, cursor?: string) {
   }
 
   const page = list.slice(0, limit);
-  const enriched = page.map((v) => ({
-    ...v,
-    isLiked: likes.has(key(userId, v.id)),
-    isSaved: saves.has(key(userId, v.id)),
-  }));
+  const enriched = page.map((v) => enrichVideo(v, userId));
 
   return {
     videos: enriched,
@@ -262,25 +297,13 @@ export function fallbackAddComment(userId: string, videoId: string, text: string
 export function fallbackGetSaved(userId: string) {
   return videos
     .filter((v) => saves.has(key(userId, v.id)))
-    .map((v) => ({
-      id: v.id,
-      thumbnailUrl: v.thumbnailUrl,
-      url: v.url,
-      caption: v.caption,
-      likes: v.likes,
-    }));
+    .map((v) => enrichVideo(v, userId));
 }
 
 export function fallbackGetLiked(userId: string) {
   return videos
     .filter((v) => likes.has(key(userId, v.id)))
-    .map((v) => ({
-      id: v.id,
-      thumbnailUrl: v.thumbnailUrl,
-      url: v.url,
-      caption: v.caption,
-      likes: v.likes,
-    }));
+    .map((v) => enrichVideo(v, userId));
 }
 
 export function fallbackSearchUsers(q: string) {
@@ -300,19 +323,15 @@ export function fallbackSearchUsers(q: string) {
     }));
 }
 
-export function fallbackSearchVideos(q: string) {
-  return videos
-    .filter(
-      (v) =>
-        v.caption.toLowerCase().includes(q.toLowerCase()) ||
-        v.category.toLowerCase().includes(q.toLowerCase()),
-    )
-    .slice(0, 20)
-    .map((v) => ({
-      id: v.id,
-      thumbnailUrl: v.thumbnailUrl,
-      caption: v.caption,
-      category: v.category,
-      likes: v.likes,
-    }));
+export function fallbackSearchVideos(q: string, userId?: string) {
+  return dedupeByUrl(videos.filter((v) => matchesQuery(v, q)))
+    .slice(0, 24)
+    .map((v) => enrichVideo(v, userId ?? 'guest'));
+}
+
+export function fallbackGetVideosByIds(ids: string[], userId: string) {
+  return ids
+    .map((id) => getVideoById(id))
+    .filter((v): v is MemoryVideo => Boolean(v))
+    .map((v) => enrichVideo(v, userId));
 }

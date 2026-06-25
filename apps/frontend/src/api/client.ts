@@ -149,11 +149,5 @@ export async function searchUsers(q: string) {
 
 export async function searchVideos(q: string) {
   const { data } = await api.get('/search/videos', { params: { q } });
-  return data.videos as Array<{
-    id: string;
-    thumbnailUrl: string;
-    caption: string;
-    category: string;
-    likes: number;
-  }>;
+  return data.videos as Video[];
 }
