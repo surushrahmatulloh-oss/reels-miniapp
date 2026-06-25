@@ -82,13 +82,16 @@ export const useFeedStore = create<FeedState>((set, get) => ({
       ),
     })),
   toggleMute: () => set((state) => ({ isMuted: !state.isMuted })),
-  openPlayback: (playbackVideos, startIndex = 0) =>
+  openPlayback: (playbackVideos, startIndex = 0) => {
+    window.Telegram?.WebApp?.HapticFeedback?.impactOccurred('light');
+    window.Telegram?.WebApp?.expand?.();
     set({
       playbackOpen: true,
       playbackVideos: dedupeVideosByUrl(playbackVideos),
       playbackIndex: startIndex,
       currentIndex: startIndex,
-    }),
+    });
+  },
   closePlayback: () =>
     set({
       playbackOpen: false,

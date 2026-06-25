@@ -57,7 +57,7 @@ const CATEGORIES = [
   'technology', 'animation', 'entertainment', 'education', 'business', 'science',
 ] as const;
 
-/** Ҳар видё URL-и уникалӣ дорад — такрор намешавад */
+/** Танҳо URL-ҳои санҷидашуда — аз Render кор мекунанд */
 const REEL_POOL: Array<{
   url: string;
   caption: string;
@@ -72,25 +72,13 @@ const REEL_POOL: Array<{
   { url: 'https://interactive-examples.mdn.mozilla.net/media/cc0-videos/flower.mp4', caption: 'Гулҳои баҳор 🌸', music: 'Soft Piano', category: 'nature', hashtags: ['flowers', 'nature', 'aesthetic'] },
   { url: 'https://interactive-examples.mdn.mozilla.net/media/cc0-videos/friday.mp4', caption: 'Ҷумъа муборак 🎵', music: 'Friday Mood', category: 'music', hashtags: ['music', 'friday', 'vibes'] },
   { url: 'https://www.w3schools.com/html/mov_bbb.mp4', caption: 'Анимацияи зебо 🎬', music: 'Fun Mix', category: 'animation', hashtags: ['animation', 'cute', 'reels'] },
-  { url: 'https://filesamples.com/samples/video/mp4/sample_640x360.mp4', caption: 'Технологияи нав 💻', music: 'Tech Wave', category: 'technology', hashtags: ['tech', 'gadgets', 'reels'] },
-  { url: 'https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/ForBiggerBlazes.mp4', caption: 'Сафари ҷолиб ✈️', music: 'Travel Dreams', category: 'travel', hashtags: ['travel', 'adventure', 'explore'] },
   { url: 'https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/ForBiggerEscapes.mp4', caption: 'Мода ва услуб 👗', music: 'Fashion Week', category: 'fashion', hashtags: ['fashion', 'style', 'ootd'] },
-  { url: 'https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/ForBiggerFun.mp4', caption: 'Хушмазагӣ ва кӯҳна 🎭', music: 'Party Mix', category: 'entertainment', hashtags: ['fun', 'party', 'viral'] },
-  { url: 'https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/ForBiggerJoyrides.mp4', caption: 'Таълим ва илм 📚', music: 'Study Lo-Fi', category: 'education', hashtags: ['education', 'learn', 'tips'] },
-  { url: 'https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/ForBiggerMeltdowns.mp4', caption: 'Тиҷорат ва муваффақият 💼', music: 'Hustle Mode', category: 'business', hashtags: ['business', 'money', 'motivation'] },
-  { url: 'https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/ElephantsDream.mp4', caption: 'Reels эстетик 🎥', music: 'Dreamy', category: 'entertainment', hashtags: ['aesthetic', 'reels', 'fyp'] },
+  { url: 'https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/ForBiggerFun.mp4', caption: 'Хушмазагӣ 🎭', music: 'Party Mix', category: 'entertainment', hashtags: ['fun', 'party', 'viral'] },
   { url: 'https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/BigBuckBunny.mp4', caption: 'Контенти вирусӣ 🐰', music: 'Viral Sound', category: 'animation', hashtags: ['viral', 'fyp', 'reels'] },
-  { url: 'https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/SubaruOutbackOnStreetAndDirt.mp4', caption: 'Машина ва роҳ 🚗', music: 'Drive', category: 'travel', hashtags: ['cars', 'drive', 'travel'] },
-  { url: 'https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/TearsOfSteel.mp4', caption: 'Кино ва эффект 🎞️', music: 'Cinematic', category: 'entertainment', hashtags: ['cinema', 'movie', 'reels'] },
-  { url: 'https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/VolkswagenGTIReview.mp4', caption: 'Бозӣ ва варзиш 🏀', music: 'Game On', category: 'sport', hashtags: ['sport', 'game', 'reels'] },
-  { url: 'https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/WeAreGoingOnBullrun.mp4', caption: 'Шаби шаҳр 🌃', music: 'Night City', category: 'travel', hashtags: ['city', 'night', 'vibes'] },
-  { url: 'https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/WhatCarCanYouGetForAGrand.mp4', caption: 'Лайфхакҳо 💡', music: 'Tips & Tricks', category: 'education', hashtags: ['tips', 'lifehack', 'reels'] },
-  { url: 'https://filesamples.com/samples/video/mp4/sample_960x540.mp4', caption: 'Илм ва кашфиёт 🔬', music: 'Discovery', category: 'science', hashtags: ['science', 'facts', 'reels'] },
-  { url: 'https://filesamples.com/samples/video/mp4/sample_1280x720.mp4', caption: 'Рақс ва ҳаракат 💃', music: 'Dance Hit', category: 'music', hashtags: ['dance', 'music', 'viral'] },
-  { url: 'https://filesamples.com/samples/video/mp4/sample_1920x1080.mp4', caption: 'Китобҳои беҳтарин 📖', music: 'Book Club', category: 'education', hashtags: ['books', 'read', 'education'] },
+  { url: 'https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/ElephantsDream.mp4', caption: 'Reels эстетик 🎥', music: 'Dreamy', category: 'entertainment', hashtags: ['aesthetic', 'reels', 'fyp'] },
+  { url: 'https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/ForBiggerJoyrides.mp4', caption: 'Таълим ва илм 📚', music: 'Study Lo-Fi', category: 'education', hashtags: ['education', 'learn', 'tips'] },
 ];
 
-// URL-ҳои такрориро хориҷ мекунем
 const seenUrls = new Set<string>();
 const uniquePool = REEL_POOL.filter((item) => {
   if (seenUrls.has(item.url)) return false;
@@ -102,13 +90,13 @@ export const videos: MemoryVideo[] = uniquePool.map((item, idx) => ({
   id: `vid_${idx + 1}`,
   instagramId: `ig_${idx + 1}`,
   url: item.url,
-  thumbnailUrl: `https://picsum.photos/seed/reel${idx + 1}/405/720`,
+  thumbnailUrl: '',
   format: 'reels' as VideoFormat,
   category: item.category,
   hashtags: item.hashtags,
   caption: `${item.caption} #${item.category}`,
-  authorName: `@creator_${(idx % 16) + 1}`,
-  authorAvatar: `https://i.pravatar.cc/150?u=creator${idx % 16}`,
+  authorName: `@creator_${(idx % 12) + 1}`,
+  authorAvatar: `https://i.pravatar.cc/150?u=creator${idx % 12}`,
   musicTitle: item.music,
   likes: 2400 + idx * 137,
   views: 22000 + idx * 503,

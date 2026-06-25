@@ -1,3 +1,4 @@
+import { createPortal } from 'react-dom';
 import { ReelsPlayer } from './ReelsPlayer';
 import { useFeedStore } from '@/store';
 
@@ -10,12 +11,12 @@ export function ReelsOverlay() {
 
   if (!playbackOpen || playbackVideos.length === 0) return null;
 
-  return (
-    <div className="fixed inset-0 z-[100] bg-black">
+  return createPortal(
+    <div className="fixed inset-0 z-[9999] bg-black">
       <button
         type="button"
         onClick={closePlayback}
-        className="absolute right-4 top-4 z-[110] flex h-10 w-10 items-center justify-center rounded-full bg-black/60 text-xl backdrop-blur"
+        className="absolute right-4 top-4 z-[10000] flex h-10 w-10 items-center justify-center rounded-full bg-black/60 text-xl backdrop-blur"
         aria-label="Пӯшидан"
       >
         ✕
@@ -25,6 +26,7 @@ export function ReelsOverlay() {
         startIndex={playbackIndex}
         onIndexChange={setCurrentIndex}
       />
-    </div>
+    </div>,
+    document.body,
   );
 }

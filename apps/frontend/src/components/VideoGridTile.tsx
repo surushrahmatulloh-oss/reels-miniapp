@@ -1,5 +1,21 @@
+import { useEffect, useRef } from 'react';
 import type { Video } from '@/types';
 import { getPlayableUrl } from '@/utils/video';
+
+const CATEGORY_GRADIENT: Record<string, string> = {
+  music: 'from-violet-900 via-fuchsia-800 to-pink-600',
+  sport: 'from-emerald-900 via-green-700 to-lime-500',
+  nature: 'from-teal-900 via-green-800 to-emerald-500',
+  food: 'from-orange-900 via-amber-700 to-yellow-500',
+  travel: 'from-blue-900 via-indigo-700 to-cyan-500',
+  fashion: 'from-rose-900 via-pink-700 to-fuchsia-500',
+  technology: 'from-slate-900 via-blue-800 to-cyan-600',
+  animation: 'from-purple-900 via-violet-700 to-indigo-500',
+  entertainment: 'from-red-900 via-orange-800 to-amber-500',
+  education: 'from-indigo-900 via-blue-800 to-sky-500',
+  business: 'from-zinc-900 via-stone-700 to-amber-600',
+  science: 'from-cyan-900 via-teal-800 to-blue-500',
+};
 
 interface VideoGridTileProps {
   video: Video;
@@ -7,32 +23,52 @@ interface VideoGridTileProps {
 }
 
 export function VideoGridTile({ video, onClick }: VideoGridTileProps) {
+  const videoRef = useRef<HTMLVideoElement>(null);
+  const rootRef = useRef<HTMLButtonElement>(null);
+  const gradient = CATEGORY_GRADIENT[video.category] ?? 'from-gray-900 to-gray-700';
+
+  useEffect(() => {
+    const el = rootRef.current;
+    const vid = videoRef.current;
+    if (!el || !vid) return;
+
+    const observer = new IntersectionObserver(
+      ([entry]) => {
+        if (entry?.isIntersecting) {
+          void vid.play().catch(() => undefined);
+        } else {
+          vid.pause();
+          vid.currentTime = 0;
+        }
+      },
+      { threshold: 0.4 },
+    );
+    observer.observe(el);
+    return () => observer.disconnect();
+  }, []);
+
   return (
     <button
+      ref={rootRef}
       type="button"
       onClick={onClick}
-      className="group relative aspect-[9/16] w-full overflow-hidden rounded-xl bg-black text-left"
+      className={`group relative aspect-[9/16] w-full overflow-hidden rounded-xl bg-gradient-to-br ${gradient} text-left`}
     >
       <video
+        ref={videoRef}
         src={getPlayableUrl(video)}
         muted
         playsInline
         loop
-        preload="metadata"
-        poster={video.thumbnailUrl}
-        className="h-full w-full object-cover"
-        onMouseEnter={(e) => void e.currentTarget.play().catch(() => undefined)}
-        onMouseLeave={(e) => {
-          e.currentTarget.pause();
-          e.currentTarget.currentTime = 0;
-        }}
-        onTouchStart={(e) => void e.currentTarget.play().catch(() => undefined)}
+        autoPlay
+        preload="auto"
+        className="pointer-events-none absolute inset-0 h-full w-full object-cover"
       />
-      <div className="pointer-events-none absolute inset-0 bg-gradient-to-t from-black/70 via-transparent to-transparent" />
-      <div className="pointer-events-none absolute inset-0 flex items-center justify-center opacity-0 transition group-hover:opacity-100">
-        <span className="rounded-full bg-black/50 px-3 py-1 text-lg">▶</span>
+      <div className="pointer-events-none absolute inset-0 bg-gradient-to-t from-black/80 via-transparent to-black/20" />
+      <div className="pointer-events-none absolute inset-0 flex items-center justify-center">
+        <span className="rounded-full bg-black/40 px-3 py-1.5 text-base backdrop-blur-sm">▶</span>
       </div>
-      <p className="pointer-events-none absolute bottom-2 left-2 right-2 line-clamp-2 text-xs font-medium">
+      <p className="pointer-events-none absolute bottom-2 left-2 right-2 line-clamp-2 text-xs font-medium drop-shadow">
         {video.caption}
       </p>
       <span className="pointer-events-none absolute right-2 top-2 rounded bg-black/50 px-1.5 py-0.5 text-[10px]">

@@ -7,7 +7,7 @@ import { ReelsPlayer } from '@/components/ReelsPlayer';
 import { BottomNav } from '@/components/BottomNav';
 import { LoadingScreen } from '@/components/LoadingScreen';
 
-const APP_VERSION = '2.1.0';
+const APP_VERSION = '2.2.0';
 
 export function FeedPage() {
   useSocket();

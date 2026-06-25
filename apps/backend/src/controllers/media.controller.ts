@@ -45,6 +45,7 @@ export async function streamMedia(req: Request, res: Response): Promise<void> {
         'User-Agent': 'Mozilla/5.0 (compatible; ReelsMiniApp/1.0)',
       },
       redirect: 'follow',
+      signal: AbortSignal.timeout(25_000),
     });
     if (!upstream.ok || !upstream.body) {
       res.status(502).end();
