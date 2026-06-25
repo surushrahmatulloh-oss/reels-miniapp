@@ -17,7 +17,9 @@ function loadEnvFile(file) {
   const env = {};
   if (!existsSync(file)) return env;
   for (const line of readFileSync(file, 'utf8').split('\n')) {
-    const m = line.match(/^([A-Z_]+)=(.*)$/);
+    const trimmed = line.replace(/^\uFEFF/, '').replace(/\r$/, '').trim();
+    if (!trimmed || trimmed.startsWith('#')) continue;
+    const m = trimmed.match(/^([A-Z_]+)=(.*)$/);
     if (m) env[m[1]] = m[2].trim();
   }
   return env;
