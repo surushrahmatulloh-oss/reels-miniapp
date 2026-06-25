@@ -1,5 +1,6 @@
 import { useRef, useEffect, useCallback, useState } from 'react';
 import type { Video } from '@/types';
+import { getPlayableUrl } from '@/utils/video';
 import {
   likeVideo,
   unlikeVideo,
@@ -111,7 +112,7 @@ export function ReelsPlayer({ videos, onLoadMore, startIndex = 0, onIndexChange 
       if (v) {
         const link = document.createElement('link');
         link.rel = 'prefetch';
-        link.href = v.url;
+        link.href = getPlayableUrl(v);
         link.as = 'video';
         document.head.appendChild(link);
       }
@@ -226,7 +227,7 @@ export function ReelsPlayer({ videos, onLoadMore, startIndex = 0, onIndexChange 
               ref={(el) => {
                 if (el) videoRefs.current.set(index, el);
               }}
-              src={video.url}
+              src={getPlayableUrl(video)}
               className="h-full w-full object-cover"
               loop
               playsInline

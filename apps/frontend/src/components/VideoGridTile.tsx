@@ -1,4 +1,5 @@
 import type { Video } from '@/types';
+import { getPlayableUrl } from '@/utils/video';
 
 interface VideoGridTileProps {
   video: Video;
@@ -13,7 +14,7 @@ export function VideoGridTile({ video, onClick }: VideoGridTileProps) {
       className="group relative aspect-[9/16] w-full overflow-hidden rounded-xl bg-black text-left"
     >
       <video
-        src={video.url}
+        src={getPlayableUrl(video)}
         muted
         playsInline
         loop

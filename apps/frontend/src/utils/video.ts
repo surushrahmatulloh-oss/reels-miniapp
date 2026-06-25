@@ -1,5 +1,10 @@
 import type { Video } from '@/types';
 
+export function getPlayableUrl(video: Pick<Video, 'id' | 'url'>): string {
+  if (video.url.includes('/api/media/')) return video.url;
+  return `/api/media/${video.id}.mp4`;
+}
+
 export function toVideo(partial: Partial<Video> & { id: string; url: string }): Video {
   return {
     id: partial.id,
