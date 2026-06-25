@@ -20,6 +20,21 @@ import { setupSockets } from './sockets/index.js';
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
 async function main() {
+  const app = express();
+  app.set('trust proxy', 1);
+  const server = http.createServer(app);
+
+  app.get('/health', (_req, res) => {
+    res.json({ status: 'ok', timestamp: new Date().toISOString() });
+  });
+
+  await new Promise<void>((resolve) => {
+    server.listen(config.port, '0.0.0.0', () => {
+      console.log(`Backend listening on 0.0.0.0:${config.port}`);
+      resolve();
+    });
+  });
+
   await connectDatabase();
 
   try {
@@ -27,9 +42,6 @@ async function main() {
   } catch {
     console.warn('Redis unavailable — running without cache');
   }
-
-  const app = express();
-  const server = http.createServer(app);
 
   const io = new Server(server, {
     cors: {
@@ -55,10 +67,6 @@ async function main() {
     }),
   );
 
-  app.get('/health', (_req, res) => {
-    res.json({ status: 'ok', timestamp: new Date().toISOString() });
-  });
-
   app.get('/api/media/:id', streamMedia);
 
   app.use('/api/auth', authRoutes);
@@ -82,9 +90,7 @@ async function main() {
     });
   }
 
-  server.listen(config.port, () => {
-    console.log(`Backend running on http://localhost:${config.port}`);
-  });
+  console.log('App routes ready');
 }
 
 main().catch((err) => {

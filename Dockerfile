@@ -1,6 +1,7 @@
 FROM node:20-alpine AS build
 WORKDIR /app
-RUN corepack enable
+RUN apk add --no-cache libc6-compat
+RUN corepack enable && corepack prepare pnpm@10.34.4 --activate
 
 COPY package.json pnpm-lock.yaml pnpm-workspace.yaml ./
 COPY apps/frontend/package.json apps/frontend/
@@ -14,12 +15,14 @@ RUN pnpm --filter backend build && pnpm --filter frontend build
 
 FROM node:20-alpine
 WORKDIR /app
-RUN corepack enable
+RUN apk add --no-cache libc6-compat
+RUN corepack enable && corepack prepare pnpm@10.34.4 --activate
 
 COPY --from=build /app /app
 
 ENV NODE_ENV=production
 ENV USE_MEMORY_DB=true
+ENV HOST=0.0.0.0
 
 EXPOSE 10000
 CMD ["node", "apps/backend/dist/index.js"]
