@@ -1,4 +1,5 @@
 import { spawn, execSync } from 'child_process';
+import { existsSync } from 'fs';
 import http from 'http';
 import path from 'path';
 import { fileURLToPath } from 'url';
@@ -7,6 +8,7 @@ const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const root = path.join(__dirname, '..');
 const backendDir = path.join(root, 'apps', 'backend');
 const frontendDir = path.join(root, 'apps', 'frontend');
+const SERVER_PORT = process.env.SERVER_PORT ?? '3001';
 
 function log(tag, msg) {
   const t = new Date().toLocaleTimeString('tg-TJ');
@@ -20,14 +22,14 @@ function ping(url) {
       resolve(res.statusCode && res.statusCode < 500);
     });
     req.on('error', () => resolve(false));
-    req.setTimeout(2000, () => {
+    req.setTimeout(3000, () => {
       req.destroy();
       resolve(false);
     });
   });
 }
 
-async function waitFor(url, label, max = 90) {
+async function waitFor(url, label, max = 120) {
   for (let i = 0; i < max; i++) {
     if (await ping(url)) {
       log(label, 'омода ✓');
@@ -38,7 +40,22 @@ async function waitFor(url, label, max = 90) {
   return false;
 }
 
-function runService(tag, command, cwd, shouldRun) {
+function ensureFrontendBuilt() {
+  const indexHtml = path.join(frontendDir, 'dist', 'index.html');
+  if (existsSync(indexHtml)) {
+    log('Build', 'frontend dist мавҷуд ✓');
+    return;
+  }
+  log('Build', 'frontend бор мешавад (1 маротиба)...');
+  execSync('npx vite build', {
+    cwd: frontendDir,
+    stdio: 'inherit',
+    shell: true,
+    env: { ...process.env, VITE_API_URL: '', VITE_WS_URL: '' },
+  });
+}
+
+function runService(tag, command, cwd, extraEnv = {}, shouldRun) {
   const start = async () => {
     if (shouldRun && !(await shouldRun())) return;
     log(tag, 'оғоз...');
@@ -47,14 +64,15 @@ function runService(tag, command, cwd, shouldRun) {
       shell: true,
       stdio: 'inherit',
       windowsHide: false,
+      env: { ...process.env, ...extraEnv },
     });
     proc.on('exit', (code) => {
-      log(tag, `қатъ шуд (код ${code}) — 3 сония баъд аз нав...`);
-      setTimeout(start, 3000);
+      log(tag, `қатъ шуд (код ${code}) — 5 сония баъд аз нав...`);
+      setTimeout(start, 5000);
     });
     proc.on('error', (err) => {
       log(tag, `хато: ${err.message}`);
-      setTimeout(start, 3000);
+      setTimeout(start, 5000);
     });
   };
   void start();
@@ -63,29 +81,44 @@ function runService(tag, command, cwd, shouldRun) {
 async function main() {
   console.log('');
   console.log('========================================');
-  console.log('  Reels Mini App — ҳама дар як терминал');
+  console.log('  Reels Mini App — режими устувор');
+  console.log('  (production — бе хатоҳои ngrok)');
   console.log('  ИН ТЕРМИНАЛРО НАПУШЕД!');
   console.log('========================================');
   console.log('');
 
+  ensureFrontendBuilt();
+
+  const serverEnv = {
+    NODE_ENV: 'production',
+    USE_MEMORY_DB: 'true',
+    PORT: SERVER_PORT,
+    TUNNEL_PORT: SERVER_PORT,
+  };
+
   runService(
-    'Backend',
-    'npx tsx watch src/index.ts',
+    'Server',
+    'npx tsx src/index.ts',
     backendDir,
-    async () => !(await ping('http://127.0.0.1:3001/health')),
+    serverEnv,
+    async () => {
+      if (await ping(`http://127.0.0.1:${SERVER_PORT}/health`)) {
+        log('Server', 'аллакай кор мекунад ✓');
+        return false;
+      }
+      return true;
+    },
   );
 
-  runService(
-    'Frontend',
-    'npx vite --port 5173 --strictPort',
-    frontendDir,
-    async () => !(await ping('http://127.0.0.1:5173/')),
-  );
+  const ok = await waitFor(`http://127.0.0.1:${SERVER_PORT}/health`, 'Server');
+  if (!ok) {
+    console.error('Server оғоз нашуд! stop.bat иҷро кунед ва аз нав.');
+    process.exit(1);
+  }
 
-  await waitFor('http://127.0.0.1:5173/', 'Frontend');
-  await waitFor('http://127.0.0.1:3001/health', 'Backend');
+  await waitFor(`http://127.0.0.1:${SERVER_PORT}/`, 'Frontend');
 
-  runService('Tunnel', 'node scripts/tunnel.mjs', root);
+  runService('Tunnel', 'node scripts/tunnel.mjs', root, { TUNNEL_PORT: SERVER_PORT });
 
   log('OK', 'Ҳама кор мекунад. Дар Telegram: @miniapprealsBot');
 }

@@ -21,8 +21,9 @@ async function main() {
     process.exit(1);
   }
 
+  const port = Number(process.env.TUNNEL_PORT ?? 5173);
   const listener = await ngrok.forward({
-    addr: 5173,
+    addr: port,
     authtoken: token,
     on_status_change: (_addr, err) => {
       if (err) console.error('ngrok disconnected:', err);

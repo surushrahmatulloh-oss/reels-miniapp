@@ -52,67 +52,47 @@ export const comments = new Map<string, Array<{
   user: { id: string; username: string; avatarUrl: string; displayName: string };
 }>>();
 
-/** Vertical MP4 clips with audio (Mixkit CDN — free, reliable). */
+/** MP4 — CDN-ҳои коркунанда (403 нест) */
 const REEL_SOURCES = [
   {
-    url: 'https://assets.mixkit.co/videos/preview/mixkit-woman-running-above-the-camera-32808-large.mp4',
-    caption: 'Ҷустуҷӯи шаҳр 🏃‍♀️',
-    music: 'City Run — Trending',
+    url: 'https://download.samplelib.com/mp4/sample-5s.mp4',
+    caption: 'Reels #1 🔥',
+    music: 'Trending Beat',
   },
   {
-    url: 'https://assets.mixkit.co/videos/preview/mixkit-young-woman-walking-among-the-skyscrapers-43300-large.mp4',
-    caption: 'Манхэттен шаб 🌃',
-    music: 'Night Walk — Viral',
+    url: 'https://download.samplelib.com/mp4/sample-10s.mp4',
+    caption: 'Reels #2 ✨',
+    music: 'Viral Sound',
   },
   {
-    url: 'https://assets.mixkit.co/videos/preview/mixkit-girl-in-neon-sign-1232-large.mp4',
-    caption: 'Неон ва музика 💜',
-    music: 'Neon Dreams',
+    url: 'https://download.samplelib.com/mp4/sample-15s.mp4',
+    caption: 'Reels #3 🎬',
+    music: 'Fun Mix',
   },
   {
-    url: 'https://assets.mixkit.co/videos/preview/mixkit-tree-branches-in-the-breeze-11848-large.mp4',
-    caption: 'Табиат ва оромиш 🌿',
-    music: 'Nature Calm',
+    url: 'https://download.samplelib.com/mp4/sample-20s.mp4',
+    caption: 'Reels #4 🎢',
+    music: 'Energy',
   },
   {
-    url: 'https://assets.mixkit.co/videos/preview/mixkit-waves-coming-to-the-beach-5016-large.mp4',
-    caption: 'Сохили баҳр 🌊',
-    music: 'Ocean Vibes',
+    url: 'https://interactive-examples.mdn.mozilla.net/media/cc0-videos/flower.mp4',
+    caption: 'Reels #5 🌸',
+    music: 'Nature',
   },
   {
-    url: 'https://assets.mixkit.co/videos/preview/mixkit-mother-with-her-little-daughter-eating-marshmallows-in-nature-39778-large.mp4',
-    caption: 'Оила ва табиат 👨‍👩‍👧',
-    music: 'Family Time',
+    url: 'https://interactive-examples.mdn.mozilla.net/media/cc0-videos/friday.mp4',
+    caption: 'Reels #6 🎵',
+    music: 'Friday',
   },
   {
-    url: 'https://assets.mixkit.co/videos/preview/mixkit-portrait-of-a-woman-in-a-pool-1259-large.mp4',
-    caption: 'Тобистони гарм ☀️',
-    music: 'Summer Hit',
+    url: 'https://www.w3schools.com/html/mov_bbb.mp4',
+    caption: 'Reels #7 🐰',
+    music: 'Classic',
   },
   {
-    url: 'https://assets.mixkit.co/videos/preview/mixkit-man-dancing-under-changing-lights-1240-large.mp4',
-    caption: 'Рақс ва музика 🕺',
-    music: 'Dance Floor',
-  },
-  {
-    url: 'https://assets.mixkit.co/videos/preview/mixkit-close-up-of-a-woman-having-a-video-call-42708-large.mp4',
-    caption: 'Tech & lifestyle 📱',
-    music: 'Digital Life',
-  },
-  {
-    url: 'https://assets.mixkit.co/videos/preview/mixkit-woman-doing-yoga-on-a-mountain-32806-large.mp4',
-    caption: 'Йога дар кӯҳ ⛰️',
-    music: 'Zen Flow',
-  },
-  {
-    url: 'https://assets.mixkit.co/videos/preview/mixkit-slow-motion-of-a-woman-holding-a-cocktail-42707-large.mp4',
-    caption: 'Шаби зебо 🍹',
-    music: 'Cocktail Hour',
-  },
-  {
-    url: 'https://assets.mixkit.co/videos/preview/mixkit-hands-of-a-woman-typing-on-a-laptop-4472-large.mp4',
-    caption: 'Кор ва илҳом 💻',
-    music: 'Focus Mode',
+    url: 'https://filesamples.com/samples/video/mp4/sample_640x360.mp4',
+    caption: 'Reels #8 📱',
+    music: 'HD Clip',
   },
 ];
 

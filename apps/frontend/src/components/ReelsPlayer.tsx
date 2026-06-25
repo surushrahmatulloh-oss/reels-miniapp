@@ -214,16 +214,25 @@ export function ReelsPlayer({ videos, onLoadMore }: ReelsPlayerProps) {
                 if (el) videoRefs.current.set(index, el);
               }}
               src={video.url}
-              poster={playingIndex === index ? undefined : video.thumbnailUrl}
               className="h-full w-full object-cover"
               loop
               playsInline
+              autoPlay={index === currentIndex}
               muted={isMuted}
-              preload={Math.abs(index - currentIndex) <= 2 ? 'auto' : 'metadata'}
+              preload={index === currentIndex ? 'auto' : 'metadata'}
               onLoadedData={() => {
                 if (index === currentIndex) void playVideo(index);
               }}
-              onPlaying={() => setPlayingIndex(index)}
+              onCanPlay={() => {
+                if (index === currentIndex) void playVideo(index);
+              }}
+              onPlaying={() => {
+                setPlayingIndex(index);
+                setNeedsTap(false);
+              }}
+              onError={() => {
+                if (index === currentIndex) setNeedsTap(true);
+              }}
             />
 
             {needsTap && index === currentIndex && (

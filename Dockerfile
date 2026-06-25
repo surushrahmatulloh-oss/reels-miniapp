@@ -16,12 +16,7 @@ FROM node:20-alpine
 WORKDIR /app
 RUN corepack enable
 
-COPY package.json pnpm-lock.yaml pnpm-workspace.yaml ./
-COPY apps/backend/package.json apps/backend/
-RUN pnpm install --frozen-lockfile --filter backend
-
-COPY --from=build /app/apps/backend/dist apps/backend/dist
-COPY --from=build /app/apps/frontend/dist apps/frontend/dist
+COPY --from=build /app /app
 
 ENV NODE_ENV=production
 ENV USE_MEMORY_DB=true

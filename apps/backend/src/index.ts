@@ -14,6 +14,7 @@ import userRoutes from './routes/user.routes.js';
 import feedRoutes from './routes/feed.routes.js';
 import videoRoutes from './routes/video.routes.js';
 import searchRoutes from './routes/search.routes.js';
+import { streamMedia } from './controllers/media.controller.js';
 import { setupSockets } from './sockets/index.js';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
@@ -57,6 +58,8 @@ async function main() {
   app.get('/health', (_req, res) => {
     res.json({ status: 'ok', timestamp: new Date().toISOString() });
   });
+
+  app.get('/api/media/:id', streamMedia);
 
   app.use('/api/auth', authRoutes);
   app.use('/api/users', userRoutes);

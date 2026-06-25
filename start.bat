@@ -9,27 +9,28 @@ echo ========================================
 
 where node >nul 2>&1 || (echo Node.js ёфт нашуд! & pause & exit /b 1)
 
+echo Қатъ кардани серверҳои қадим...
+for /f "tokens=5" %%a in ('netstat -ano ^| findstr ":3001 " ^| findstr LISTENING') do taskkill /F /PID %%a >nul 2>&1
+timeout /t 2 /nobreak >nul
+
 if not exist "node_modules\" (
   call npm install -g pnpm
   call pnpm install
 )
 
-where cloudflared >nul 2>&1
-if errorlevel 1 (
-  echo Насби cloudflared...
-  winget install --id Cloudflare.cloudflared -e --accept-package-agreements --accept-source-agreements --disable-interactivity >nul 2>&1
-)
+echo.
+echo Боркунии frontend...
+cd apps\frontend
+call npx vite build
+cd ..\..
+echo.
 
-echo.
 echo Ҳама дар ЯК терминал оғоз мешавад.
-echo URL дар поёни экран намоиш дода мешавад.
-echo.
 echo Дар Telegram: @miniapprealsBot
 echo ИН ТЕРМИНАЛРО НАПУШЕД!
-echo.
-echo Агар 503 биёяд: setup-ngrok.bat иҷро кунед (устувор)
 echo ========================================
 echo.
 
 node scripts\run-all.mjs
 pause
+ 

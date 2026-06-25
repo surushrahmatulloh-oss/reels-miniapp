@@ -14,6 +14,8 @@ const cfLocal = path.join(toolsDir, 'cloudflared.exe');
 const cfTemp = path.join(process.env.TEMP || '', 'cloudflared.exe');
 const urlFile = path.join(root, 'tunnel-url.txt');
 const envFile = path.join(root, '.env');
+const TUNNEL_PORT = Number(process.env.TUNNEL_PORT ?? 5173);
+const TUNNEL_HOST = `http://127.0.0.1:${TUNNEL_PORT}`;
 
 const CF_URL =
   'https://github.com/cloudflare/cloudflared/releases/latest/download/cloudflared-windows-amd64.exe';
@@ -120,7 +122,7 @@ async function waitForFrontend(maxAttempts = 30) {
   for (let i = 0; i < maxAttempts; i++) {
     try {
       await new Promise((resolve, reject) => {
-        const req = http.get('http://127.0.0.1:5173/', (res) => {
+        const req = http.get(`${TUNNEL_HOST}/`, (res) => {
           res.resume();
           if (res.statusCode && res.statusCode < 500) resolve();
           else reject();
@@ -131,14 +133,14 @@ async function waitForFrontend(maxAttempts = 30) {
           reject(new Error('timeout'));
         });
       });
-      console.log('Frontend омода аст.');
+      console.log(`Сервер омода аст (порт ${TUNNEL_PORT}).`);
       return;
     } catch {
-      console.log(`Интизори frontend... (${i + 1}/${maxAttempts})`);
+      console.log(`Интизори сервер... (${i + 1}/${maxAttempts})`);
       await new Promise((r) => setTimeout(r, 2000));
     }
   }
-  throw new Error('Frontend дар порти 5173 кор намекунад. Аввал start.bat-ро иҷро кунед.');
+  throw new Error(`Сервер дар порти ${TUNNEL_PORT} кор намекунад. start.bat-ро иҷро кунед.`);
 }
 
 async function updateBotUrl(url) {
@@ -224,19 +226,32 @@ function runProcess(command, urlPattern, cwd = root, opts = {}) {
 }
 
 async function startNgrok(token) {
-  console.log('Tunnel: ngrok (устувор, бе IP)');
-  const sdkDir = path.join(root, 'tools', 'ngrok-sdk');
-  await runProcess(
-    `node tunnel.mjs ${token}`,
-    /https:\/\/[a-z0-9-]+\.(ngrok-free\.app|ngrok-free\.dev|ngrok\.io)/i,
-    sdkDir,
-    { stdin: 'pipe' },
-  );
+  console.log(`Tunnel: ngrok → порт ${TUNNEL_PORT}`);
+  const ngrokPath = path.join(root, 'tools', 'ngrok-sdk', 'node_modules', '@ngrok', 'ngrok', 'index.js');
+  const ngrok = await import(`file:///${ngrokPath.replace(/\\/g, '/')}`);
+
+  const listener = await ngrok.forward({
+    addr: TUNNEL_PORT,
+    authtoken: token,
+    on_status_change: (_addr, err) => {
+      if (err) console.error('ngrok disconnected:', err);
+    },
+  });
+
+  const url = listener.url();
+  if (!url) throw new Error('ngrok URL гирифта нашуд');
+
+  saveUrl(url);
+  await updateBotUrl(url);
+  console.log(`ngrok-url: ${url}`);
+
+  setInterval(() => {}, 60_000);
+  await new Promise(() => {});
 }
 
 async function startCloudflared(exe) {
   console.log('Tunnel: cloudflared');
-  await runProcess(`"${exe}" tunnel --url http://127.0.0.1:5173`, /https:\/\/[a-z0-9-]+\.trycloudflare\.com/i);
+  await runProcess(`"${exe}" tunnel --url ${TUNNEL_HOST}`, /https:\/\/[a-z0-9-]+\.trycloudflare\.com/i);
 }
 
 async function fetchTunnelIp(url) {
