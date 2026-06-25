@@ -1,5 +1,5 @@
-import { useCallback } from 'react';
-import { useQuery } from '@tanstack/react-query';
+import { useCallback, useEffect } from 'react';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { getFeed } from '@/api/client';
 import { useFeedStore } from '@/store';
 import { useSocket } from '@/hooks';
@@ -7,8 +7,22 @@ import { ReelsPlayer } from '@/components/ReelsPlayer';
 import { BottomNav } from '@/components/BottomNav';
 import { LoadingScreen } from '@/components/LoadingScreen';
 
+const APP_VERSION = '2.1.0';
+
 export function FeedPage() {
   useSocket();
+  const queryClient = useQueryClient();
+
+  useEffect(() => {
+    const prev = localStorage.getItem('reels_app_version');
+    if (prev !== APP_VERSION) {
+      localStorage.setItem('reels_app_version', APP_VERSION);
+      void queryClient.invalidateQueries({ queryKey: ['feed'] });
+      void queryClient.invalidateQueries({ queryKey: ['search-videos'] });
+      void queryClient.invalidateQueries({ queryKey: ['saved'] });
+      void queryClient.invalidateQueries({ queryKey: ['liked'] });
+    }
+  }, [queryClient]);
 
   const videos = useFeedStore((s) => s.videos);
   const nextCursor = useFeedStore((s) => s.nextCursor);
@@ -24,7 +38,8 @@ export function FeedPage() {
       setPagination(data.nextCursor, data.hasMore);
       return data;
     },
-    staleTime: 30_000,
+    staleTime: 0,
+    refetchOnMount: 'always',
   });
 
   const loadMore = useCallback(async () => {

@@ -137,11 +137,15 @@ export function fallbackUpdatePreferences(
   return serializeMemoryUser(user);
 }
 
+function publicVideoUrl(videoId: string): string {
+  return `/api/media/${videoId}.mp4`;
+}
+
 function enrichVideo(v: MemoryVideo, userId: string) {
   return {
     id: v.id,
     instagramId: v.instagramId,
-    url: v.url,
+    url: publicVideoUrl(v.id),
     thumbnailUrl: v.thumbnailUrl,
     format: v.format,
     category: v.category,

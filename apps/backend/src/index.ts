@@ -16,6 +16,7 @@ import videoRoutes from './routes/video.routes.js';
 import searchRoutes from './routes/search.routes.js';
 import { streamMedia } from './controllers/media.controller.js';
 import { setupSockets } from './sockets/index.js';
+import { videos } from './store/fallback.js';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
@@ -25,7 +26,12 @@ async function main() {
   const server = http.createServer(app);
 
   app.get('/health', (_req, res) => {
-    res.json({ status: 'ok', timestamp: new Date().toISOString() });
+    res.json({
+      status: 'ok',
+      version: '2.1.0',
+      videos: videos.length,
+      timestamp: new Date().toISOString(),
+    });
   });
 
   await new Promise<void>((resolve) => {
@@ -64,6 +70,7 @@ async function main() {
       max: 120,
       standardHeaders: true,
       legacyHeaders: false,
+      skip: (req) => req.path.startsWith('/api/media/'),
     }),
   );
 
@@ -77,9 +84,19 @@ async function main() {
 
   if (config.isProduction) {
     const frontendDist = path.join(__dirname, '../../frontend/dist');
-    app.use(express.static(frontendDist));
+    app.use(
+      express.static(frontendDist, {
+        maxAge: '1d',
+        setHeaders(res, filePath) {
+          if (filePath.endsWith('index.html')) {
+            res.setHeader('Cache-Control', 'no-cache, no-store, must-revalidate');
+          }
+        },
+      }),
+    );
     app.get('*', (req, res, next) => {
       if (req.path.startsWith('/api')) return next();
+      res.setHeader('Cache-Control', 'no-cache, no-store, must-revalidate');
       res.sendFile(path.join(frontendDist, 'index.html'), (err) => {
         if (err) next(err);
       });
