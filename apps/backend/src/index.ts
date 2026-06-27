@@ -28,7 +28,7 @@ async function main() {
   app.get('/health', (_req, res) => {
     res.json({
       status: 'ok',
-      version: '2.3.0',
+      version: '2.3.1',
       videos: videos.length,
       timestamp: new Date().toISOString(),
     });

@@ -3,6 +3,8 @@ services:
     name: reels-miniapp
     runtime: docker
     plan: free
+    branch: main
+    autoDeploy: true
     healthCheckPath: /health
     envVars:
       - key: NODE_ENV

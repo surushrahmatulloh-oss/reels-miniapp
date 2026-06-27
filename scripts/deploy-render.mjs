@@ -95,7 +95,7 @@ function pushToGitHub(cloneUrl) {
   } catch {
     run(`git remote add origin "${url}"`);
   }
-  run('git push -u origin main --force');
+  run('git push -u origin main');
 }
 
 async function renderApi(method, apiPath, body) {
