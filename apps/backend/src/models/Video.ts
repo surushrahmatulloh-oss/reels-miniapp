@@ -3,9 +3,11 @@ import type { VideoFormat } from '../types/index.js';
 
 export interface IVideo extends Document {
   _id: Types.ObjectId;
+  youtubeId?: string;
   instagramId: string;
   url: string;
   thumbnailUrl: string;
+  title: string;
   format: VideoFormat;
   category: string;
   hashtags: string[];
@@ -23,9 +25,11 @@ export interface IVideo extends Document {
 
 const videoSchema = new Schema<IVideo>(
   {
+    youtubeId: { type: String, unique: true, sparse: true, index: true },
     instagramId: { type: String, required: true, unique: true, index: true },
     url: { type: String, required: true },
     thumbnailUrl: { type: String, required: true },
+    title: { type: String, default: '' },
     format: {
       type: String,
       enum: ['reels', 'igtv', 'stories'],

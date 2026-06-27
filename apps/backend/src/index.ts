@@ -14,6 +14,7 @@ import userRoutes from './routes/user.routes.js';
 import feedRoutes from './routes/feed.routes.js';
 import videoRoutes from './routes/video.routes.js';
 import searchRoutes from './routes/search.routes.js';
+import adminRoutes from './routes/admin.routes.js';
 import { streamMedia } from './controllers/media.controller.js';
 import { setupSockets } from './sockets/index.js';
 import { videos } from './store/fallback.js';
@@ -81,6 +82,7 @@ async function main() {
   app.use('/api/feed', feedRoutes);
   app.use('/api/videos', videoRoutes);
   app.use('/api/search', searchRoutes);
+  app.use('/api/admin', adminRoutes);
 
   if (config.isProduction) {
     const frontendDist = path.join(__dirname, '../../frontend/dist');

@@ -8,6 +8,7 @@
     "build": "tsc",
     "start": "node dist/index.js",
     "seed": "tsx src/seed.ts",
+    "fetch-youtube": "tsx src/scripts/fetchYouTubeVideos.ts",
     "lint": "eslint src"
   },
   "dependencies": {

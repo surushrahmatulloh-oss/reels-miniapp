@@ -23,6 +23,8 @@ export const config = {
   mongodbUri: process.env.MONGODB_URI ?? 'mongodb://localhost:27017/reels-miniapp',
   useMemoryDb: process.env.USE_MEMORY_DB === 'true',
   redisUrl: process.env.REDIS_URL ?? 'redis://localhost:6379',
+  youtubeApiKey: process.env.YOUTUBE_API_KEY ?? '',
+  adminApiKey: process.env.ADMIN_API_KEY ?? '',
   isDev: process.env.NODE_ENV !== 'production',
   isProduction: process.env.NODE_ENV === 'production',
 };

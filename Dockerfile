@@ -21,7 +21,7 @@ RUN corepack enable && corepack prepare pnpm@10.34.4 --activate
 COPY --from=build /app /app
 
 ENV NODE_ENV=production
-ENV USE_MEMORY_DB=true
+ENV USE_MEMORY_DB=false
 ENV HOST=0.0.0.0
 
 EXPOSE 10000
