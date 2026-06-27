@@ -300,6 +300,6 @@ export async function searchVideos(req: AuthRequest, res: Response): Promise<voi
     .limit(24)
     .lean();
 
-  const enriched = await enrichVideos(videos, req.user!.userId);
+  const enriched = await enrichVideos(videos as unknown as import('../models/Video.js').IVideo[], req.user!.userId);
   res.json({ videos: enriched });
 }

@@ -1,0 +1,10 @@
+#!/bin/bash
+# Runs after every git commit — push to GitHub
+ROOT="$(git rev-parse --show-toplevel)"
+cd "$ROOT"
+
+if command -v node >/dev/null 2>&1 && [ -f "$ROOT/scripts/push-github.mjs" ]; then
+  node "$ROOT/scripts/push-github.mjs" || git push origin HEAD
+else
+  git push origin HEAD
+fi

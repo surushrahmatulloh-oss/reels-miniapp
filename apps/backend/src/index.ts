@@ -110,6 +110,11 @@ async function main() {
   console.log('App routes ready');
 }
 
+// Prevent crash on unhandled errors
+process.on('unhandledRejection', (err) => {
+  console.error('Unhandled rejection:', err);
+});
+
 main().catch((err) => {
   console.error('Failed to start server:', err);
   process.exit(1);
