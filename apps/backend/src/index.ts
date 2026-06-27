@@ -17,7 +17,8 @@ import searchRoutes from './routes/search.routes.js';
 import adminRoutes from './routes/admin.routes.js';
 import { streamMedia } from './controllers/media.controller.js';
 import { setupSockets } from './sockets/index.js';
-import { videos } from './store/fallback.js';
+import { videos, isFallbackMode } from './store/fallback.js';
+import { Video } from './models/Video.js';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
@@ -26,11 +27,26 @@ async function main() {
   app.set('trust proxy', 1);
   const server = http.createServer(app);
 
-  app.get('/health', (_req, res) => {
+  app.get('/health', async (_req, res) => {
+    let videoCount = videos.length;
+    let db = config.useMemoryDb ? 'memory' : 'mongodb';
+
+    if (isFallbackMode()) {
+      db = 'fallback';
+    } else {
+      try {
+        videoCount = await Video.countDocuments();
+      } catch {
+        /* mongoose not ready */
+      }
+    }
+
     res.json({
       status: 'ok',
-      version: '2.3.1',
-      videos: videos.length,
+      version: '2.4.0',
+      db,
+      videos: videoCount,
+      admin: true,
       timestamp: new Date().toISOString(),
     });
   });

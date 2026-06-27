@@ -20,6 +20,9 @@ echo 4. ADMIN_API_KEY = ^(secret key for admin API^)
 echo.
 echo 5. Save Changes ^> Manual Deploy
 echo.
+echo Ё автоматӣ (агар RENDER_API_KEY дар .env.deploy бошад):
+echo   node scripts\setup-render-atlas.mjs
+echo.
 echo ========================================
 start https://dashboard.render.com/
 echo.
