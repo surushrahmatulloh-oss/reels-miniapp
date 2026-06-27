@@ -4,7 +4,6 @@
  * Дар .env.deploy гузоред:
  *   RENDER_API_KEY=rnd_...
  *   MONGODB_URI=mongodb+srv://...
- *   YOUTUBE_API_KEY=...
  *   ADMIN_API_KEY=...
  *   USE_MEMORY_DB=false
  */
@@ -40,7 +39,6 @@ const ADMIN_API_KEY = env.ADMIN_API_KEY;
 const ENV_TO_SET = {
   MONGODB_URI: env.MONGODB_URI,
   USE_MEMORY_DB: env.USE_MEMORY_DB ?? 'false',
-  YOUTUBE_API_KEY: env.YOUTUBE_API_KEY,
   ADMIN_API_KEY: env.ADMIN_API_KEY,
 };
 
@@ -157,12 +155,12 @@ async function main() {
     console.error('RENDER_API_KEY дар .env.deploy нест.');
     console.error('→ https://dashboard.render.com/u/settings#api-keys');
     console.error('\nДастӣ: Dashboard → reels-miniapp → Environment');
-    console.error('  MONGODB_URI, USE_MEMORY_DB=false, YOUTUBE_API_KEY, ADMIN_API_KEY');
+    console.error('  MONGODB_URI, USE_MEMORY_DB=false, ADMIN_API_KEY');
     console.error('→ Save → Manual Deploy → node scripts/trigger-fetch-videos.mjs');
     process.exit(1);
   }
 
-  const missing = ['MONGODB_URI', 'YOUTUBE_API_KEY', 'ADMIN_API_KEY'].filter((k) => !ENV_TO_SET[k]);
+  const missing = ['MONGODB_URI', 'ADMIN_API_KEY'].filter((k) => !ENV_TO_SET[k]);
   if (missing.length) {
     console.error('Дар .env.deploy нест:', missing.join(', '));
     process.exit(1);

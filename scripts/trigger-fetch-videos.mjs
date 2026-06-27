@@ -1,6 +1,5 @@
 /**
- * POST /api/admin/fetch-videos on Render (after deploy)
- * Reads ADMIN_API_KEY from .env or .env.deploy
+ * POST /api/admin/fetch-videos on Render — seeds sample YouTube embed videos to MongoDB
  */
 import { existsSync, readFileSync } from 'fs';
 import path from 'path';
