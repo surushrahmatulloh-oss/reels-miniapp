@@ -36,6 +36,20 @@ function formatCount(n: number): string {
 
 const LOG = '[ReelsPlayer]';
 
+function logVideoState(el: HTMLVideoElement, label: string, extra?: Record<string, unknown>) {
+  console.log(LOG, label, {
+    src: el.currentSrc,
+    paused: el.paused,
+    ended: el.ended,
+    readyState: el.readyState,
+    networkState: el.networkState,
+    currentTime: el.currentTime,
+    mediaError: el.error?.code,
+    mediaErrorMsg: el.error?.message,
+    ...extra,
+  });
+}
+
 async function tryPlayVideo(
   el: HTMLVideoElement,
   label: string,
@@ -50,6 +64,7 @@ async function tryPlayVideo(
     await el.play();
     if (unmuteAfter) el.muted = false;
     console.log(LOG, `play OK (${label})`, { src: el.currentSrc, paused: el.paused });
+    logVideoState(el, `state after play OK (${label})`);
     return true;
   } catch (err) {
     console.warn(LOG, `play FAIL (${label})`, {
@@ -58,6 +73,7 @@ async function tryPlayVideo(
       networkState: el.networkState,
       error: err instanceof Error ? err.message : String(err),
     });
+    logVideoState(el, `state after play FAIL (${label})`);
     return false;
   }
 }
@@ -90,6 +106,8 @@ export function ReelsPlayer({
   const containerRef = useRef<HTMLDivElement>(null);
   const videoRefs = useRef<Map<number, HTMLVideoElement>>(new Map());
   const lastTapRef = useRef(0);
+  const userPausedRef = useRef(false);
+  const playBlockedRef = useRef(false);
   const [heartAnim, setHeartAnim] = useState<{ x: number; y: number } | null>(null);
   const [commentsOpen, setCommentsOpen] = useState(false);
   const [showPlayBtn, setShowPlayBtn] = useState(false);
@@ -101,6 +119,29 @@ export function ReelsPlayer({
   const isMuted = useFeedStore((s) => s.isMuted);
   const updateVideo = useFeedStore((s) => s.updateVideo);
   const toggleMute = useFeedStore((s) => s.toggleMute);
+
+  const syncPlayOverlay = useCallback((index: number, reason: string) => {
+    const el = videoRefs.current.get(index);
+    if (!el || index !== currentIndex) return;
+
+    const isActuallyPlaying = !el.paused && !el.ended && el.readyState >= 2;
+    const shouldShow =
+      !isActuallyPlaying && (playBlockedRef.current || userPausedRef.current) && !el.ended;
+
+    console.log(LOG, 'syncPlayOverlay', {
+      reason,
+      index,
+      shouldShow,
+      isActuallyPlaying,
+      userPaused: userPausedRef.current,
+      playBlocked: playBlockedRef.current,
+      paused: el.paused,
+      readyState: el.readyState,
+      currentTime: el.currentTime,
+    });
+
+    setShowPlayBtn(shouldShow);
+  }, [currentIndex]);
 
   useEffect(() => {
     if (startIndex > 0) {
@@ -116,10 +157,17 @@ export function ReelsPlayer({
 
   const playVideo = useCallback(
     (index: number) => {
+      userPausedRef.current = false;
+      playBlockedRef.current = false;
       for (const [i, video] of videoRefs.current) {
         if (i === index) {
           void playWithFallback(video, `playVideo idx=${index}`, !isMuted).then((ok) => {
-            if (i === index) setShowPlayBtn(!ok && video.paused);
+            if (!ok && video.paused) {
+              playBlockedRef.current = true;
+            } else {
+              playBlockedRef.current = false;
+            }
+            syncPlayOverlay(index, `playVideo done ok=${ok}`);
           });
         } else {
           video.pause();
@@ -127,12 +175,14 @@ export function ReelsPlayer({
         }
       }
     },
-    [isMuted],
+    [isMuted, syncPlayOverlay],
   );
 
   useEffect(() => {
-    playVideo(currentIndex);
+    userPausedRef.current = false;
+    playBlockedRef.current = false;
     setShowPlayBtn(false);
+    playVideo(currentIndex);
     const video = videos[currentIndex];
     if (!video) return;
 
@@ -160,15 +210,26 @@ export function ReelsPlayer({
       readyState: el.readyState,
     });
 
-    void playWithFallback(el, `useEffect idx=${currentIndex}`, !isMuted);
+    void playWithFallback(el, `useEffect idx=${currentIndex}`, !isMuted).then((ok) => {
+      if (!ok && el.paused) playBlockedRef.current = true;
+      else if (!el.paused) playBlockedRef.current = false;
+      syncPlayOverlay(currentIndex, `useEffect mount ok=${ok}`);
+    });
 
     const onLoaded = () => {
-      console.log(LOG, 'loadeddata', { index: currentIndex, src: el.currentSrc });
-      void playWithFallback(el, `loadeddata idx=${currentIndex}`, !isMuted);
+      logVideoState(el, `loadeddata idx=${currentIndex}`);
+      void playWithFallback(el, `loadeddata idx=${currentIndex}`, !isMuted).then((ok) => {
+        if (!ok && el.paused) playBlockedRef.current = true;
+        else if (!el.paused) playBlockedRef.current = false;
+        syncPlayOverlay(currentIndex, `loadeddata ok=${ok}`);
+      });
     };
     const onCanPlay = () => {
-      console.log(LOG, 'canplay', { index: currentIndex });
-      void playWithFallback(el, `canplay idx=${currentIndex}`, !isMuted);
+      void playWithFallback(el, `canplay idx=${currentIndex}`, !isMuted).then((ok) => {
+        if (!ok && el.paused) playBlockedRef.current = true;
+        else if (!el.paused) playBlockedRef.current = false;
+        syncPlayOverlay(currentIndex, `canplay ok=${ok}`);
+      });
     };
 
     el.addEventListener('loadeddata', onLoaded);
@@ -178,7 +239,7 @@ export function ReelsPlayer({
       el.removeEventListener('loadeddata', onLoaded);
       el.removeEventListener('canplay', onCanPlay);
     };
-  }, [currentIndex, videos, isMuted]);
+  }, [currentIndex, videos, isMuted, syncPlayOverlay]);
 
   const handleScroll = () => {
     const container = containerRef.current;
@@ -214,10 +275,13 @@ export function ReelsPlayer({
     if (Date.now() - lastTapRef.current < 300) return;
     const el = videoRefs.current.get(index);
     if (el && !el.paused) {
+      userPausedRef.current = true;
       el.pause();
-      setShowPlayBtn(true);
+      syncPlayOverlay(index, 'user tap pause');
       return;
     }
+    userPausedRef.current = false;
+    playBlockedRef.current = false;
     void handlePlayButton(index);
   };
 
@@ -238,14 +302,17 @@ export function ReelsPlayer({
     try {
       await el.play();
       if (!isMuted) el.muted = false;
-      setShowPlayBtn(false);
+      userPausedRef.current = false;
+      playBlockedRef.current = false;
+      syncPlayOverlay(index, 'handlePlayButton direct OK');
       console.log(LOG, 'handlePlayButton: direct play OK', { paused: el.paused });
     } catch (err) {
       console.warn(LOG, 'handlePlayButton: direct play failed, fallback', {
         error: err instanceof Error ? err.message : String(err),
       });
-      await playWithFallback(el, `play-btn idx=${index}`, !isMuted);
-      setShowPlayBtn(el.paused);
+      const ok = await playWithFallback(el, `play-btn idx=${index}`, !isMuted);
+      playBlockedRef.current = !ok && el.paused;
+      syncPlayOverlay(index, `handlePlayButton fallback ok=${ok}`);
     }
   };
 
@@ -321,14 +388,30 @@ export function ReelsPlayer({
               onLoadedData={() => {
                 const el = videoRefs.current.get(index);
                 if (el && index === currentIndex) {
-                  console.log(LOG, 'onLoadedData prop', index);
-                  void playWithFallback(el, `onLoadedData idx=${index}`, !isMuted);
+                  void playWithFallback(el, `onLoadedData idx=${index}`, !isMuted).then((ok) => {
+                    if (!ok && el.paused) playBlockedRef.current = true;
+                    else if (!el.paused) playBlockedRef.current = false;
+                    syncPlayOverlay(index, `onLoadedData ok=${ok}`);
+                  });
                 }
               }}
               onCanPlay={() => {
                 const el = videoRefs.current.get(index);
                 if (el && index === currentIndex) {
-                  void playWithFallback(el, `onCanPlay prop idx=${index}`, !isMuted);
+                  void playWithFallback(el, `onCanPlay prop idx=${index}`, !isMuted).then((ok) => {
+                    if (!ok && el.paused) playBlockedRef.current = true;
+                    else if (!el.paused) playBlockedRef.current = false;
+                    syncPlayOverlay(index, `onCanPlay ok=${ok}`);
+                  });
+                }
+              }}
+              onTimeUpdate={(e) => {
+                const el = e.currentTarget;
+                if (index !== currentIndex) return;
+                if (!el.paused && el.currentTime > 0.05) {
+                  playBlockedRef.current = false;
+                  userPausedRef.current = false;
+                  setShowPlayBtn(false);
                 }
               }}
               onError={(e) => {
@@ -340,16 +423,18 @@ export function ReelsPlayer({
                   mediaError: el.error?.code,
                   message: el.error?.message,
                 });
-                if (index === currentIndex) setShowPlayBtn(true);
+                logVideoState(el, `video error idx=${index}`);
+                if (index === currentIndex) {
+                  playBlockedRef.current = true;
+                  syncPlayOverlay(index, 'onError');
+                }
               }}
               onPlaying={() => {
-                console.log(LOG, 'playing', { index, src: videoRefs.current.get(index)?.currentSrc });
-                if (index === currentIndex) setShowPlayBtn(false);
-              }}
-              onPause={() => {
-                if (index === currentIndex && !videoRefs.current.get(index)?.ended) {
-                  setShowPlayBtn(true);
-                }
+                if (index !== currentIndex) return;
+                playBlockedRef.current = false;
+                userPausedRef.current = false;
+                setShowPlayBtn(false);
+                logVideoState(videoRefs.current.get(index)!, `playing idx=${index}`);
               }}
             />
 
