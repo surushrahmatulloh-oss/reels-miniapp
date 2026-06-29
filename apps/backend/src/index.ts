@@ -3,7 +3,6 @@ import cors from 'cors';
 import http from 'http';
 import path from 'path';
 import { fileURLToPath } from 'url';
-import mongoose from 'mongoose';
 import { Server } from 'socket.io';
 import rateLimit from 'express-rate-limit';
 import { config } from './config.js';
@@ -21,7 +20,7 @@ import { setupSockets } from './sockets/index.js';
 import { videos, isFallbackMode } from './store/fallback.js';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
-const APP_VERSION = '4.9.1';
+const APP_VERSION = '4.9.2';
 
 async function main() {
   const app = express();
@@ -30,13 +29,10 @@ async function main() {
 
   // Lightweight health — no DB query (Render health check must be instant)
   app.get('/health', (_req, res) => {
-    const mongoState = mongoose.connection.readyState;
-    const mongoStatus =
-      mongoState === 1 ? 'connected' : mongoState === 2 ? 'connecting' : 'disconnected';
     res.json({
       status: 'ok',
       version: APP_VERSION,
-      mongo: mongoStatus,
+      mongo: isFallbackMode() ? 'fallback' : 'managed',
       fallback: isFallbackMode(),
       timestamp: new Date().toISOString(),
     });
