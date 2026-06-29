@@ -112,8 +112,12 @@ export function ReelsPlayer({
   const setStoreIndex = useFeedStore((s) => s.setCurrentIndex);
   const currentIndex = controlledIndex ?? storeIndex;
   const setCurrentIndex = onIndexChange ?? setStoreIndex;
-  const [isMuted, setIsMuted] = useState(true);
+  const [isMuted, setIsMuted] = useState<boolean>(() => {
+    const raw = window.localStorage.getItem('reels:muted');
+    return raw == null ? false : raw === '1';
+  });
   const updateVideo = useFeedStore((s) => s.updateVideo);
+  const recoverAttemptsRef = useRef<Map<number, number>>(new Map());
 
   const syncPlayOverlay = useCallback((index: number, reason: string) => {
     const el = videoRefs.current.get(index);
@@ -156,9 +160,20 @@ export function ReelsPlayer({
       playBlockedRef.current = false;
       for (const [i, video] of videoRefs.current) {
         if (i === index) {
+          video.load();
           video.muted = isMuted;
           void playWithFallback(video, `playVideo idx=${index}`).then((ok) => {
             if (!ok && video.paused) {
+              // Telegram/WebView can block autoplay with sound. Retry muted once.
+              if (!video.muted) {
+                video.muted = true;
+                setIsMuted(true);
+                void playWithFallback(video, `playVideo muted-retry idx=${index}`).then((retryOk) => {
+                  playBlockedRef.current = !retryOk && video.paused;
+                  syncPlayOverlay(index, `playVideo muted-retry ok=${retryOk}`);
+                });
+                return;
+              }
               playBlockedRef.current = true;
             } else {
               playBlockedRef.current = false;
@@ -244,6 +259,10 @@ export function ReelsPlayer({
     }
   }, [isMuted, currentIndex]);
 
+  useEffect(() => {
+    window.localStorage.setItem('reels:muted', isMuted ? '1' : '0');
+  }, [isMuted]);
+
   const handleScroll = () => {
     const container = containerRef.current;
     if (!container) return;
@@ -295,7 +314,9 @@ export function ReelsPlayer({
       return;
     }
 
-    el.muted = isMuted;
+    const nextMuted = false;
+    setIsMuted(nextMuted);
+    el.muted = nextMuted;
     el.playsInline = true;
     el.setAttribute('playsinline', '');
     el.setAttribute('webkit-playsinline', '');
@@ -303,7 +324,7 @@ export function ReelsPlayer({
     console.log(LOG, 'handlePlayButton: direct play()', { index, src: el.currentSrc });
 
     try {
-      el.muted = isMuted;
+      el.muted = false;
       await el.play();
       userPausedRef.current = false;
       playBlockedRef.current = false;
@@ -428,9 +449,37 @@ export function ReelsPlayer({
                 });
                 logVideoState(el, `video error idx=${index}`);
                 if (index === currentIndex) {
+                  const attempt = recoverAttemptsRef.current.get(index) ?? 0;
+                  if (attempt < 2) {
+                    recoverAttemptsRef.current.set(index, attempt + 1);
+                    window.setTimeout(() => {
+                      el.load();
+                      void playWithFallback(el, `recover-onError idx=${index} attempt=${attempt + 1}`).then((ok) => {
+                        playBlockedRef.current = !ok && el.paused;
+                        syncPlayOverlay(index, `recover-onError ok=${ok}`);
+                      });
+                    }, 250);
+                    return;
+                  }
                   playBlockedRef.current = true;
-                  syncPlayOverlay(index, 'onError');
+                  syncPlayOverlay(index, 'onError final');
                 }
+              }}
+              onStalled={() => {
+                const el = videoRefs.current.get(index);
+                if (!el || index !== currentIndex) return;
+                void playWithFallback(el, `stalled idx=${index}`).then((ok) => {
+                  playBlockedRef.current = !ok && el.paused;
+                  syncPlayOverlay(index, `stalled ok=${ok}`);
+                });
+              }}
+              onWaiting={() => {
+                const el = videoRefs.current.get(index);
+                if (!el || index !== currentIndex) return;
+                void playWithFallback(el, `waiting idx=${index}`).then((ok) => {
+                  playBlockedRef.current = !ok && el.paused;
+                  syncPlayOverlay(index, `waiting ok=${ok}`);
+                });
               }}
               onPlaying={() => {
                 if (index !== currentIndex) return;
