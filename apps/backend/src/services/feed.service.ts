@@ -98,7 +98,7 @@ export async function buildFeed(params: {
     ...(Object.keys(idFilter).length > 0 ? { _id: idFilter } : {}),
   };
 
-  const fetchLimit = limit * 4;
+  const fetchLimit = limit * 30;
 
   let candidates = await Video.find({
     ...baseFilter,

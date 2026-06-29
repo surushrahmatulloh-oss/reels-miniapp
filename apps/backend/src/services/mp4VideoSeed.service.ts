@@ -4,9 +4,37 @@ import { config } from '../config.js';
 import { isFallbackMode } from '../store/fallback.js';
 import { Video } from '../models/Video.js';
 import { SEED_CATEGORIES } from '../data/youtubeSamplePool.js';
-import { fetchVideosForCategory, isPlayableMp4Url } from './pexelsVideo.service.js';
+import { fetchVideosForCategory, isPlayableMp4Url, FALLBACK_MP4 } from './pexelsVideo.service.js';
 
 const VIDEOS_PER_CATEGORY = 80;
+
+async function fixDuplicateUrls(): Promise<number> {
+  const usedUrls = new Set(
+    (await Video.find({ url: { $not: { $regex: /youtube/i } } }).select('url').lean()).map((v) => v.url),
+  );
+  const groups = await Video.aggregate<{ _id: string; ids: mongoose.Types.ObjectId[] }>([
+    { $match: { url: { $not: { $regex: /youtube/i } } } },
+    { $group: { _id: '$url', ids: { $push: '$_id' }, count: { $sum: 1 } } },
+    { $match: { count: { $gt: 1 } } },
+  ]);
+
+  let fixed = 0;
+  let poolIdx = 0;
+  for (const group of groups) {
+    for (const id of group.ids.slice(1)) {
+      let newUrl = FALLBACK_MP4[poolIdx % FALLBACK_MP4.length]!.mp4Url;
+      while (usedUrls.has(newUrl)) {
+        poolIdx++;
+        newUrl = FALLBACK_MP4[poolIdx % FALLBACK_MP4.length]!.mp4Url;
+      }
+      await Video.updateOne({ _id: id }, { $set: { url: newUrl } });
+      usedUrls.add(newUrl);
+      poolIdx++;
+      fixed++;
+    }
+  }
+  return fixed;
+}
 
 export async function connectMongoForSeed(): Promise<void> {
   if (mongoose.connection.readyState === 1) return;
@@ -31,6 +59,9 @@ export async function seedMp4Videos(options?: {
   await connectMongoForSeed();
 
   const perCategory = options?.perCategory ?? VIDEOS_PER_CATEGORY;
+
+  const deduped = await fixDuplicateUrls();
+  if (deduped > 0) console.log(`[mp4-seed] fixed duplicate URLs: ${deduped}`);
 
   if (options?.clearYoutube) {
     await Video.deleteMany({ url: { $regex: /youtube\.com\/embed/i } });

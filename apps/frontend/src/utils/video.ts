@@ -2,12 +2,19 @@ import type { Video } from '@/types';
 
 const API_URL = (import.meta.env.VITE_API_URL ?? '').replace(/\/$/, '');
 
+function isDirectMp4(url: string): boolean {
+  if (!url || /youtube\.com|youtu\.be/i.test(url)) return false;
+  return /^https?:\/\//i.test(url) && (
+    /\.mp4(\?|$)/i.test(url) ||
+    /videos\.pexels\.com|cdn\.pixabay\.com|commondatastorage\.googleapis\.com|interactive-examples\.mdn/i.test(url)
+  );
+}
+
+/** Prefer direct CDN MP4 — plays in Telegram WebView without server proxy */
 export function getPlayableUrl(video: Pick<Video, 'id' | 'url'> & { playUrl?: string }): string {
+  if (video.url && isDirectMp4(video.url)) return video.url;
   const path = video.playUrl ?? `/api/media/${video.id}.mp4`;
   if (path.startsWith('http')) return path;
-  if (/youtube\.com|youtu\.be/i.test(video.url ?? '')) {
-    return API_URL ? `${API_URL}${path}` : path;
-  }
   return API_URL ? `${API_URL}${path}` : path;
 }
 
