@@ -16,39 +16,69 @@ export function SearchPage() {
   const [debounced, setDebounced] = useState('');
   const openPlayback = useFeedStore((s) => s.openPlayback);
 
-  const handleSearch = (value: string) => {
+  const isTextSearch = debounced.length >= 2;
+
+  const handleSearchInput = (value: string) => {
     setQuery(value);
-    window.clearTimeout((handleSearch as unknown as { timer?: number }).timer);
-    (handleSearch as unknown as { timer?: number }).timer = window.setTimeout(
+    window.clearTimeout((handleSearchInput as unknown as { timer?: number }).timer);
+    (handleSearchInput as unknown as { timer?: number }).timer = window.setTimeout(
       () => setDebounced(value.trim()),
       350,
     );
   };
 
-  const { data: exploreVideos = [], isLoading: exploreLoading } = useQuery({
-    queryKey: ['search-explore', activeCategory],
-    queryFn: () => searchVideos(activeCategory ?? 'reels'),
+  const exploreQuery = activeCategory ?? 'reels';
+
+  const {
+    data: exploreVideos = [],
+    isLoading: exploreLoading,
+    isError: exploreError,
+    error: exploreErr,
+    refetch: refetchExplore,
+  } = useQuery({
+    queryKey: ['search-explore', exploreQuery],
+    queryFn: () => searchVideos(exploreQuery),
     staleTime: 120_000,
+    enabled: !isTextSearch,
   });
 
-  const { data: users = [] } = useQuery({
+  const {
+    data: users = [],
+    isError: usersError,
+    refetch: refetchUsers,
+  } = useQuery({
     queryKey: ['search-users', debounced],
     queryFn: () => searchUsers(debounced),
-    enabled: debounced.length >= 2,
+    enabled: isTextSearch,
   });
 
-  const { data: videos = [], isLoading: searchLoading } = useQuery({
+  const {
+    data: videos = [],
+    isLoading: searchLoading,
+    isError: searchError,
+    error: searchErr,
+    refetch: refetchSearch,
+  } = useQuery({
     queryKey: ['search-videos', debounced],
     queryFn: () => searchVideos(debounced),
-    enabled: debounced.length >= 2,
+    enabled: isTextSearch,
   });
 
-  const videoList: Video[] = (debounced.length >= 2 ? videos : exploreVideos).map((v) =>
-    toVideo(v),
-  );
+  const rawList = isTextSearch ? videos : exploreVideos;
+  const videoList: Video[] = rawList.map((v) => toVideo(v));
+  const listLoading = isTextSearch ? searchLoading : exploreLoading;
+  const listError = isTextSearch ? searchError : exploreError;
+  const listErr = isTextSearch ? searchErr : exploreErr;
+  const refetchList = isTextSearch ? refetchSearch : refetchExplore;
 
   const openVideo = (index: number) => {
     openPlayback(videoList, index);
+  };
+
+  const selectCategory = (catId: string) => {
+    setActiveCategory((prev) => (prev === catId ? null : catId));
+    setQuery('');
+    setDebounced('');
   };
 
   return (
@@ -58,23 +88,20 @@ export function SearchPage() {
           <IconSearch className="h-5 w-5 text-ig-muted" />
           <input
             value={query}
-            onChange={(e) => handleSearch(e.target.value)}
+            onChange={(e) => handleSearchInput(e.target.value)}
             placeholder="Ҷустуҷӯ"
             className="flex-1 bg-transparent text-sm text-white outline-none placeholder:text-ig-muted"
           />
         </div>
       </div>
 
-      {!debounced && (
+      {!isTextSearch && (
         <div className="flex gap-2 overflow-x-auto px-4 py-3 scrollbar-hide">
           {CATEGORIES.map((cat) => (
             <button
               key={cat.id}
               type="button"
-              onClick={() => {
-                setActiveCategory(cat.id);
-                handleSearch(cat.id);
-              }}
+              onClick={() => selectCategory(cat.id)}
               className={`shrink-0 rounded-full border px-3 py-1.5 text-xs font-medium transition ${
                 activeCategory === cat.id
                   ? 'border-ig-accent bg-ig-accent/15 text-white'
@@ -88,7 +115,25 @@ export function SearchPage() {
       )}
 
       <div className="flex-1 overflow-y-auto">
-        {debounced.length >= 2 && users.length > 0 && (
+        {(listError || usersError) && (
+          <div className="mx-4 mt-4 rounded-xl border border-red-500/40 bg-red-500/10 px-4 py-3 text-center">
+            <p className="text-sm text-red-300">
+              {listErr instanceof Error ? listErr.message : 'Хатогии ҷустуҷӯ'}
+            </p>
+            <button
+              type="button"
+              onClick={() => {
+                void refetchList();
+                if (usersError) void refetchUsers();
+              }}
+              className="mt-2 text-xs font-semibold text-white underline"
+            >
+              Боз кӯшиш
+            </button>
+          </div>
+        )}
+
+        {isTextSearch && users.length > 0 && (
           <section className="border-b border-ig-border px-4 py-3">
             <h2 className="mb-2 text-xs font-semibold uppercase text-ig-muted">Корбарон</h2>
             {users.map((u) => (
@@ -107,19 +152,19 @@ export function SearchPage() {
           </section>
         )}
 
-        {(searchLoading || exploreLoading) && videoList.length === 0 ? (
+        {listLoading && videoList.length === 0 ? (
           <SearchSkeleton />
-        ) : (
+        ) : videoList.length > 0 ? (
           <div className="grid grid-cols-3 gap-0.5">
             {videoList.map((video, index) => (
               <VideoGridTile key={video.id} video={video} onClick={() => openVideo(index)} />
             ))}
           </div>
-        )}
-
-        {debounced.length >= 2 && !searchLoading && users.length === 0 && videoList.length === 0 && (
-          <p className="py-16 text-center text-sm text-ig-muted">Натиҷа ёфт нашуд</p>
-        )}
+        ) : !listLoading && !listError ? (
+          <p className="py-16 text-center text-sm text-ig-muted">
+            {isTextSearch ? 'Натиҷа ёфт нашуд' : 'Видё нест — категорияи дигар интихоб кунед'}
+          </p>
+        ) : null}
       </div>
 
       <BottomNav />

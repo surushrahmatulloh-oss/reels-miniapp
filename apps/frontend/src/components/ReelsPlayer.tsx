@@ -67,15 +67,16 @@ async function playWithFallback(
   el: HTMLVideoElement,
   label: string,
   unmuteAfter = false,
-): Promise<void> {
-  if (await tryPlayVideo(el, label, unmuteAfter)) return;
+): Promise<boolean> {
+  if (await tryPlayVideo(el, label, unmuteAfter)) return true;
 
   for (const delay of [150, 400, 900]) {
     await new Promise((r) => window.setTimeout(r, delay));
-    if (await tryPlayVideo(el, `${label}-retry@${delay}ms`, unmuteAfter)) return;
+    if (await tryPlayVideo(el, `${label}-retry@${delay}ms`, unmuteAfter)) return true;
   }
 
   console.error(LOG, `all play attempts failed (${label})`, el.currentSrc);
+  return false;
 }
 
 export function ReelsPlayer({
@@ -91,6 +92,7 @@ export function ReelsPlayer({
   const lastTapRef = useRef(0);
   const [heartAnim, setHeartAnim] = useState<{ x: number; y: number } | null>(null);
   const [commentsOpen, setCommentsOpen] = useState(false);
+  const [showPlayBtn, setShowPlayBtn] = useState(false);
 
   const storeIndex = useFeedStore((s) => s.currentIndex);
   const setStoreIndex = useFeedStore((s) => s.setCurrentIndex);
@@ -116,7 +118,9 @@ export function ReelsPlayer({
     (index: number) => {
       for (const [i, video] of videoRefs.current) {
         if (i === index) {
-          void playWithFallback(video, `playVideo idx=${index}`, !isMuted);
+          void playWithFallback(video, `playVideo idx=${index}`, !isMuted).then((ok) => {
+            if (i === index) setShowPlayBtn(!ok && video.paused);
+          });
         } else {
           video.pause();
           video.currentTime = 0;
@@ -128,6 +132,7 @@ export function ReelsPlayer({
 
   useEffect(() => {
     playVideo(currentIndex);
+    setShowPlayBtn(false);
     const video = videos[currentIndex];
     if (!video) return;
 
@@ -208,16 +213,39 @@ export function ReelsPlayer({
   const handleTap = (index: number) => {
     if (Date.now() - lastTapRef.current < 300) return;
     const el = videoRefs.current.get(index);
-    if (!el) {
-      console.warn(LOG, 'handleTap: no video element', index);
+    if (el && !el.paused) {
+      el.pause();
+      setShowPlayBtn(true);
       return;
     }
-    if (el.paused) {
-      console.log(LOG, 'handleTap: play', { index, src: el.currentSrc });
-      void playWithFallback(el, `tap idx=${index}`, !isMuted);
-    } else {
-      console.log(LOG, 'handleTap: pause', { index });
-      el.pause();
+    void handlePlayButton(index);
+  };
+
+  const handlePlayButton = async (index: number) => {
+    const el = videoRefs.current.get(index);
+    if (!el) {
+      console.warn(LOG, 'handlePlayButton: no video element', index);
+      return;
+    }
+
+    el.muted = true;
+    el.playsInline = true;
+    el.setAttribute('playsinline', '');
+    el.setAttribute('webkit-playsinline', '');
+
+    console.log(LOG, 'handlePlayButton: direct play()', { index, src: el.currentSrc });
+
+    try {
+      await el.play();
+      if (!isMuted) el.muted = false;
+      setShowPlayBtn(false);
+      console.log(LOG, 'handlePlayButton: direct play OK', { paused: el.paused });
+    } catch (err) {
+      console.warn(LOG, 'handlePlayButton: direct play failed, fallback', {
+        error: err instanceof Error ? err.message : String(err),
+      });
+      await playWithFallback(el, `play-btn idx=${index}`, !isMuted);
+      setShowPlayBtn(el.paused);
     }
   };
 
@@ -312,11 +340,34 @@ export function ReelsPlayer({
                   mediaError: el.error?.code,
                   message: el.error?.message,
                 });
+                if (index === currentIndex) setShowPlayBtn(true);
               }}
               onPlaying={() => {
                 console.log(LOG, 'playing', { index, src: videoRefs.current.get(index)?.currentSrc });
+                if (index === currentIndex) setShowPlayBtn(false);
+              }}
+              onPause={() => {
+                if (index === currentIndex && !videoRefs.current.get(index)?.ended) {
+                  setShowPlayBtn(true);
+                }
               }}
             />
+
+            {index === currentIndex && showPlayBtn && (
+              <button
+                type="button"
+                aria-label="Пахш"
+                className="absolute inset-0 z-20 flex items-center justify-center bg-black/25"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  void handlePlayButton(index);
+                }}
+              >
+                <span className="flex h-20 w-20 items-center justify-center rounded-full bg-black/55 text-4xl text-white shadow-lg backdrop-blur-sm">
+                  ▶
+                </span>
+              </button>
+            )}
 
             <div className="pointer-events-none absolute inset-0 bg-gradient-to-b from-black/20 via-transparent to-black/60" />
 
