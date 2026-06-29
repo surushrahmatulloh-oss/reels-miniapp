@@ -64,10 +64,6 @@ export async function seedMp4Videos(options?: {
       }
 
       const dedupeKey = videoDedupeKey(entry.mp4Url, entry.sourceId);
-      if (existingKeys.has(dedupeKey)) {
-        skipped++;
-        continue;
-      }
 
       globalIndex++;
       const hash = Buffer.from(`${globalIndex}_${category}_${entry.mp4Url}`)

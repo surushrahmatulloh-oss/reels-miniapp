@@ -21,7 +21,7 @@ import { setupSockets } from './sockets/index.js';
 import { videos, isFallbackMode } from './store/fallback.js';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
-const APP_VERSION = '4.9.0';
+const APP_VERSION = '4.9.1';
 
 async function main() {
   const app = express();
