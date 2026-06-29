@@ -2,17 +2,8 @@ import type { Video } from '@/types';
 
 const API_URL = (import.meta.env.VITE_API_URL ?? '').replace(/\/$/, '');
 
-function isDirectMp4(url: string): boolean {
-  if (!url || /youtube\.com|youtu\.be/i.test(url)) return false;
-  return /^https?:\/\//i.test(url) && (
-    /\.mp4(\?|$)/i.test(url) ||
-    /videos\.pexels\.com|cdn\.pixabay\.com|commondatastorage\.googleapis\.com|interactive-examples\.mdn/i.test(url)
-  );
-}
-
-/** Prefer direct CDN MP4 — plays in Telegram WebView without server proxy */
+/** Always same-origin proxy — reliable in Telegram WebView */
 export function getPlayableUrl(video: Pick<Video, 'id' | 'url'> & { playUrl?: string }): string {
-  if (video.url && isDirectMp4(video.url)) return video.url;
   const path = video.playUrl ?? `/api/media/${video.id}.mp4`;
   if (path.startsWith('http')) return path;
   return API_URL ? `${API_URL}${path}` : path;
@@ -20,13 +11,10 @@ export function getPlayableUrl(video: Pick<Video, 'id' | 'url'> & { playUrl?: st
 
 export function toVideo(partial: Partial<Video> & { id: string; playUrl?: string }): Video {
   const playUrl = partial.playUrl ?? `/api/media/${partial.id}.mp4`;
-  const url = partial.url && !/youtube\.com\/embed/i.test(partial.url)
-    ? partial.url
-    : playUrl;
   return {
     id: partial.id,
     instagramId: partial.instagramId ?? partial.id,
-    url,
+    url: playUrl,
     playUrl,
     thumbnailUrl: partial.thumbnailUrl ?? `https://picsum.photos/seed/reel${partial.id}/720/1280`,
     format: partial.format ?? 'reels',
@@ -61,10 +49,10 @@ export function dedupeVideosByUrl(videos: Video[]): Video[] {
   const seenUrls = new Set<string>();
   return videos.filter((v) => {
     if (seenIds.has(v.id)) return false;
-    const mediaUrl = v.url || v.playUrl || '';
-    if (mediaUrl && seenUrls.has(mediaUrl)) return false;
+    const mediaUrl = v.id;
+    if (seenUrls.has(mediaUrl)) return false;
     seenIds.add(v.id);
-    if (mediaUrl) seenUrls.add(mediaUrl);
+    seenUrls.add(mediaUrl);
     return true;
   });
 }

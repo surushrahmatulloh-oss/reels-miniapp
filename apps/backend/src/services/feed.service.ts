@@ -4,7 +4,7 @@ import { View } from '../models/Interaction.js';
 import { Like, Save } from '../models/Interaction.js';
 import { cacheGet, cacheSet } from '../redis.js';
 import type { VideoFormat } from '../types/index.js';
-import { isPlayableMp4Url } from './pexelsVideo.service.js';
+import { normalizePlaybackUrl } from '../data/workingMp4Pool.js';
 
 const CATEGORIES = [
   'music',
@@ -170,11 +170,11 @@ export async function enrichVideos(
 
   return videos.map((video) => {
     const id = video._id.toString();
-    const directMp4 = isPlayableMp4Url(video.url) ? video.url : '';
+    const playbackUrl = normalizePlaybackUrl(video.url, id);
     return {
       id,
       instagramId: video.instagramId,
-      url: directMp4,
+      url: playbackUrl,
       playUrl: `/api/media/${id}.mp4`,
       thumbnailUrl: video.thumbnailUrl,
       title: video.title,

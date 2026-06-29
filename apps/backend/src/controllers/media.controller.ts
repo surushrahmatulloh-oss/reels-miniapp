@@ -3,7 +3,7 @@ import { Readable } from 'stream';
 import { Video } from '../models/Video.js';
 import { isFallbackMode, videos as memoryVideos } from '../store/fallback.js';
 import { getParam } from '../utils/params.js';
-import { isPlayableMp4Url } from '../services/pexelsVideo.service.js';
+import { normalizePlaybackUrl } from '../data/workingMp4Pool.js';
 
 export function mediaUrl(videoId: string): string {
   return `/api/media/${videoId}.mp4`;
@@ -11,7 +11,8 @@ export function mediaUrl(videoId: string): string {
 
 function resolveSourceUrl(videoId: string): string | null {
   if (isFallbackMode()) {
-    return memoryVideos.find((v) => v.id === videoId)?.url ?? null;
+    const url = memoryVideos.find((v) => v.id === videoId)?.url ?? null;
+    return url ? normalizePlaybackUrl(url, videoId) : null;
   }
   return null;
 }
@@ -20,35 +21,31 @@ export async function streamMedia(req: Request, res: Response): Promise<void> {
   const rawId = getParam(req, 'id') ?? '';
   const videoId = rawId.replace(/\.mp4$/i, '');
 
-  let sourceUrl = resolveSourceUrl(videoId);
+  let storedUrl = resolveSourceUrl(videoId);
 
-  if (!sourceUrl && !isFallbackMode()) {
+  if (!storedUrl && !isFallbackMode()) {
     if (!/^[a-f0-9]{24}$/i.test(videoId)) {
       res.status(404).end();
       return;
     }
     const doc = await Video.findById(videoId).select('url').lean();
-    sourceUrl = doc?.url ?? null;
+    storedUrl = doc?.url ?? null;
   }
 
-  if (!sourceUrl) {
+  if (!storedUrl && !isFallbackMode()) {
     res.status(404).end();
     return;
   }
 
-  if (/youtube\.com\/embed|youtu\.be/i.test(sourceUrl)) {
-    res.status(410).json({ error: 'YouTube embed not supported — use MP4' });
-    return;
+  if (/youtube\.com\/embed|youtu\.be/i.test(storedUrl ?? '')) {
+    storedUrl = normalizePlaybackUrl(null, videoId);
   }
 
-  if (!isPlayableMp4Url(sourceUrl)) {
-    res.status(415).json({ error: 'Not a playable MP4 URL' });
-    return;
-  }
+  const sourceUrl = normalizePlaybackUrl(storedUrl, videoId);
 
   try {
     const headers: Record<string, string> = {
-      'User-Agent': 'Mozilla/5.0 (compatible; ReelsMiniApp/1.0)',
+      'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36',
     };
     if (req.headers.range) headers.Range = String(req.headers.range);
 

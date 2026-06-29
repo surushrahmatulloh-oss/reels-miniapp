@@ -4,9 +4,32 @@ import { config } from '../config.js';
 import { isFallbackMode } from '../store/fallback.js';
 import { Video } from '../models/Video.js';
 import { SEED_CATEGORIES } from '../data/youtubeSamplePool.js';
-import { fetchVideosForCategory, isPlayableMp4Url, FALLBACK_MP4 } from './pexelsVideo.service.js';
+import { fetchVideosForCategory, isPlayableMp4Url } from './pexelsVideo.service.js';
+import { WORKING_MP4_POOL, normalizePlaybackUrl, isServerPlayableUrl } from '../data/workingMp4Pool.js';
 
 const VIDEOS_PER_CATEGORY = 80;
+
+async function fixBrokenUrls(): Promise<number> {
+  const broken = await Video.find({
+    $or: [
+      { url: { $regex: /youtube\.com|youtu\.be|videos\.pexels\.com|commondatastorage\.googleapis/i } },
+      { url: { $not: { $regex: /\.mp4/i } } },
+    ],
+  })
+    .select('_id url')
+    .limit(500)
+    .lean();
+
+  let fixed = 0;
+  for (const row of broken) {
+    const newUrl = normalizePlaybackUrl(row.url, row._id.toString());
+    if (newUrl !== row.url) {
+      await Video.updateOne({ _id: row._id }, { $set: { url: newUrl } });
+      fixed++;
+    }
+  }
+  return fixed;
+}
 
 async function fixDuplicateUrls(): Promise<number> {
   const groups = await Video.aggregate<{ _id: string; ids: mongoose.Types.ObjectId[] }>([
@@ -31,12 +54,12 @@ async function fixDuplicateUrls(): Promise<number> {
     for (const id of group.ids.slice(1)) {
       let newUrl = '';
       let attempts = 0;
-      const maxAttempts = FALLBACK_MP4.length * 2 + 5;
+      const maxAttempts = WORKING_MP4_POOL.length * 2 + 5;
 
       while (attempts < maxAttempts) {
-        const base = FALLBACK_MP4[poolIdx % FALLBACK_MP4.length]!.mp4Url;
+        const base = WORKING_MP4_POOL[poolIdx % WORKING_MP4_POOL.length]!;
         const candidate =
-          attempts < FALLBACK_MP4.length ? base : `${base.split('?')[0]}?v=${id.toString()}`;
+          attempts < WORKING_MP4_POOL.length ? base : `${base.split('?')[0]}?v=${id.toString()}`;
         poolIdx++;
         attempts++;
         if (!usedUrls.has(candidate)) {
@@ -80,6 +103,9 @@ export async function seedMp4Videos(options?: {
   await connectMongoForSeed();
 
   const perCategory = options?.perCategory ?? VIDEOS_PER_CATEGORY;
+
+  const broken = await fixBrokenUrls();
+  if (broken > 0) console.log(`[mp4-seed] fixed broken URLs: ${broken}`);
 
   const deduped = await fixDuplicateUrls();
   if (deduped > 0) console.log(`[mp4-seed] fixed duplicate URLs: ${deduped}`);
@@ -134,7 +160,7 @@ export async function seedMp4Videos(options?: {
     const docs = [];
 
     for (const entry of pool) {
-      if (!isPlayableMp4Url(entry.mp4Url)) continue;
+      if (!isPlayableMp4Url(entry.mp4Url) && !isServerPlayableUrl(entry.mp4Url)) continue;
       if (existingUrls.has(entry.mp4Url)) {
         skipped++;
         continue;

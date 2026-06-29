@@ -34,22 +34,16 @@ function formatCount(n: number): string {
   return String(n);
 }
 
-async function tryPlay(video: HTMLVideoElement, muted: boolean): Promise<boolean> {
-  video.muted = true;
-  video.playsInline = true;
-  try {
-    await video.play();
-    if (!muted) video.muted = false;
-    return true;
-  } catch {
-    try {
-      video.muted = true;
-      await video.play();
-      return true;
-    } catch {
-      return false;
-    }
-  }
+function startPlayback(el: HTMLVideoElement, unmuteAfter = false): void {
+  el.muted = true;
+  el.playsInline = true;
+  void el.play()
+    .then(() => {
+      if (unmuteAfter) el.muted = false;
+    })
+    .catch(() => {
+      window.setTimeout(() => void el.play().catch(() => undefined), 200);
+    });
 }
 
 export function ReelsPlayer({
@@ -65,8 +59,6 @@ export function ReelsPlayer({
   const lastTapRef = useRef(0);
   const [heartAnim, setHeartAnim] = useState<{ x: number; y: number } | null>(null);
   const [commentsOpen, setCommentsOpen] = useState(false);
-  const [playingIndex, setPlayingIndex] = useState<number | null>(null);
-  const [needsTap, setNeedsTap] = useState(false);
 
   const storeIndex = useFeedStore((s) => s.currentIndex);
   const setStoreIndex = useFeedStore((s) => s.setCurrentIndex);
@@ -88,25 +80,19 @@ export function ReelsPlayer({
 
   const currentVideo = videos[currentIndex];
 
-  const playVideo = useCallback(
-    async (index: number) => {
-      let started = false;
-      for (const [i, video] of videoRefs.current) {
-        if (i === index) {
-          started = await tryPlay(video, isMuted);
-          if (started) setPlayingIndex(index);
-        } else {
-          video.pause();
-          video.currentTime = 0;
-        }
+  const playVideo = useCallback((index: number) => {
+    for (const [i, video] of videoRefs.current) {
+      if (i === index) {
+        startPlayback(video, !isMuted);
+      } else {
+        video.pause();
+        video.currentTime = 0;
       }
-      setNeedsTap(!started);
-    },
-    [isMuted],
-  );
+    }
+  }, [isMuted]);
 
   useEffect(() => {
-    void playVideo(currentIndex);
+    playVideo(currentIndex);
     const video = videos[currentIndex];
     if (!video) return;
 
@@ -123,22 +109,11 @@ export function ReelsPlayer({
 
   useEffect(() => {
     const el = videoRefs.current.get(currentIndex);
-    if (el) void tryPlay(el, isMuted);
+    if (el) {
+      el.muted = isMuted;
+      if (!el.paused) void el.play().catch(() => undefined);
+    }
   }, [isMuted, currentIndex]);
-
-  useEffect(() => {
-    const prefetchIndexes = [currentIndex + 1, currentIndex + 2, currentIndex + 3];
-    prefetchIndexes.forEach((i) => {
-      const v = videos[i];
-      if (v) {
-        const link = document.createElement('link');
-        link.rel = 'prefetch';
-        link.href = getPlayableUrl(v);
-        link.as = 'video';
-        document.head.appendChild(link);
-      }
-    });
-  }, [currentIndex, videos]);
 
   const handleScroll = () => {
     const container = containerRef.current;
@@ -174,14 +149,10 @@ export function ReelsPlayer({
     if (Date.now() - lastTapRef.current < 300) return;
     const el = videoRefs.current.get(index);
     if (!el) return;
-    if (el.paused || needsTap) {
-      void tryPlay(el, isMuted).then((ok) => {
-        setNeedsTap(!ok);
-        if (ok) setPlayingIndex(index);
-      });
+    if (el.paused) {
+      startPlayback(el, !isMuted);
     } else {
       el.pause();
-      setPlayingIndex(null);
     }
   };
 
@@ -251,41 +222,16 @@ export function ReelsPlayer({
               className="h-full w-full object-cover"
               loop
               playsInline
-              muted={isMuted}
-              defaultMuted
-              autoPlay={index === currentIndex}
-              preload={index <= currentIndex + 1 ? 'auto' : 'metadata'}
+              muted
+              autoPlay
+              preload="auto"
               onLoadedData={() => {
-                if (index === currentIndex) void playVideo(index);
+                if (index === currentIndex) startPlayback(videoRefs.current.get(index)!);
               }}
               onCanPlay={() => {
-                if (index === currentIndex) void playVideo(index);
-              }}
-              onPlaying={() => {
-                setPlayingIndex(index);
-                setNeedsTap(false);
-              }}
-              onError={() => {
-                if (index === currentIndex) setNeedsTap(true);
+                if (index === currentIndex) startPlayback(videoRefs.current.get(index)!);
               }}
             />
-
-            {needsTap && index === currentIndex && (
-              <button
-                type="button"
-                className="absolute inset-0 z-20 flex items-center justify-center bg-black/20"
-                onClick={(e) => {
-                  e.stopPropagation();
-                  const el = videoRefs.current.get(index);
-                  if (el) void tryPlay(el, isMuted).then((ok) => {
-                    setNeedsTap(!ok);
-                    if (ok) setPlayingIndex(index);
-                  });
-                }}
-              >
-                <span className="rounded-full bg-black/60 px-5 py-2.5 text-sm font-semibold">▶ Пахш кунед</span>
-              </button>
-            )}
 
             <div className="pointer-events-none absolute inset-0 bg-gradient-to-b from-black/20 via-transparent to-black/60" />
 
