@@ -79,7 +79,18 @@ async function tryPlayVideo(
 async function playWithFallback(
   el: HTMLVideoElement,
   label: string,
+  opts?: { preferSound?: boolean },
 ): Promise<boolean> {
+  const preferSound = opts?.preferSound ?? false;
+
+  if (preferSound) {
+    el.muted = false;
+    if (await tryPlayVideo(el, `${label}-sound`)) return true;
+    el.muted = true;
+  } else {
+    el.muted = true;
+  }
+
   if (await tryPlayVideo(el, label)) return true;
 
   for (const delay of [150, 400, 900]) {
@@ -104,6 +115,8 @@ export function ReelsPlayer({
   const lastTapRef = useRef(0);
   const userPausedRef = useRef(false);
   const playBlockedRef = useRef(false);
+  const playGenRef = useRef(0);
+  const userGestureRef = useRef(false);
   const [heartAnim, setHeartAnim] = useState<{ x: number; y: number } | null>(null);
   const [commentsOpen, setCommentsOpen] = useState(false);
   const [showPlayBtn, setShowPlayBtn] = useState(false);
@@ -114,10 +127,12 @@ export function ReelsPlayer({
   const setCurrentIndex = onIndexChange ?? setStoreIndex;
   const [isMuted, setIsMuted] = useState<boolean>(() => {
     const raw = window.localStorage.getItem('reels:muted');
-    return raw == null ? false : raw === '1';
+    // Telegram/WebView blocks autoplay with sound — default muted so playback starts.
+    return raw == null ? true : raw === '1';
   });
   const updateVideo = useFeedStore((s) => s.updateVideo);
   const recoverAttemptsRef = useRef<Map<number, number>>(new Map());
+  const currentVideoId = videos[currentIndex]?.id;
 
   const syncPlayOverlay = useCallback((index: number, reason: string) => {
     const el = videoRefs.current.get(index);
@@ -155,35 +170,39 @@ export function ReelsPlayer({
   const currentVideo = videos[currentIndex];
 
   const playVideo = useCallback(
-    (index: number) => {
+    (index: number, opts?: { preferSound?: boolean }) => {
+      const gen = ++playGenRef.current;
+      const preferSound = opts?.preferSound ?? (userGestureRef.current && !isMuted);
+
       userPausedRef.current = false;
       playBlockedRef.current = false;
+
       for (const [i, video] of videoRefs.current) {
-        if (i === index) {
-          video.muted = isMuted;
-          void playWithFallback(video, `playVideo idx=${index}`).then((ok) => {
-            if (!ok && video.paused) {
-              // Telegram/WebView can block autoplay with sound. Retry muted once.
-              if (!video.muted) {
-                video.muted = true;
-                setIsMuted(true);
-                void playWithFallback(video, `playVideo muted-retry idx=${index}`).then((retryOk) => {
-                  playBlockedRef.current = !retryOk && video.paused;
-                  syncPlayOverlay(index, `playVideo muted-retry ok=${retryOk}`);
-                });
-                return;
-              }
-              playBlockedRef.current = true;
-            } else {
-              playBlockedRef.current = false;
-            }
-            syncPlayOverlay(index, `playVideo done ok=${ok}`);
-          });
-        } else {
+        if (i !== index) {
           video.pause();
           video.currentTime = 0;
         }
       }
+
+      const el = videoRefs.current.get(index);
+      if (!el) return;
+
+      void playWithFallback(el, `playVideo idx=${index}`, { preferSound }).then((ok) => {
+        if (gen !== playGenRef.current) return;
+
+        if (ok) {
+          const playedMuted = el.muted;
+          if (playedMuted && preferSound) {
+            setIsMuted(true);
+          } else if (!playedMuted && preferSound) {
+            setIsMuted(false);
+          }
+          playBlockedRef.current = false;
+        } else if (el.paused) {
+          playBlockedRef.current = true;
+        }
+        syncPlayOverlay(index, `playVideo done ok=${ok}`);
+      });
     },
     [isMuted, syncPlayOverlay],
   );
@@ -205,52 +224,36 @@ export function ReelsPlayer({
     }
 
     return () => window.clearTimeout(timer);
-  }, [currentIndex, videos, playVideo, onLoadMore]);
+  }, [currentIndex, currentVideoId, playVideo, onLoadMore, videos]);
 
-  /** Fallback: manual play() after video element mounts / src changes */
+  /** Retry play once the video element is ready (single handler, no duplicate races). */
   useEffect(() => {
     const el = videoRefs.current.get(currentIndex);
     const item = videos[currentIndex];
     if (!el || !item) return;
 
-    console.log(LOG, 'useEffect mount', {
-      index: currentIndex,
-      id: item.id,
-      src: getPlayableUrl(item),
-      readyState: el.readyState,
-    });
-
-    el.muted = isMuted;
-    void playWithFallback(el, `useEffect idx=${currentIndex}`).then((ok) => {
-      if (!ok && el.paused) playBlockedRef.current = true;
-      else if (!el.paused) playBlockedRef.current = false;
-      syncPlayOverlay(currentIndex, `useEffect mount ok=${ok}`);
-    });
-
-    const onLoaded = () => {
-      logVideoState(el, `loadeddata idx=${currentIndex}`);
-      void playWithFallback(el, `loadeddata idx=${currentIndex}`).then((ok) => {
-        if (!ok && el.paused) playBlockedRef.current = true;
-        else if (!el.paused) playBlockedRef.current = false;
-        syncPlayOverlay(currentIndex, `loadeddata ok=${ok}`);
-      });
-    };
-    const onCanPlay = () => {
-      void playWithFallback(el, `canplay idx=${currentIndex}`).then((ok) => {
-        if (!ok && el.paused) playBlockedRef.current = true;
-        else if (!el.paused) playBlockedRef.current = false;
-        syncPlayOverlay(currentIndex, `canplay ok=${ok}`);
+    const gen = playGenRef.current;
+    const onReady = () => {
+      if (gen !== playGenRef.current || userPausedRef.current) return;
+      if (!el.paused && el.currentTime > 0) return;
+      void playWithFallback(el, `ready idx=${currentIndex}`, {
+        preferSound: userGestureRef.current && !isMuted,
+      }).then((ok) => {
+        if (gen !== playGenRef.current) return;
+        playBlockedRef.current = !ok && el.paused;
+        syncPlayOverlay(currentIndex, `ready ok=${ok}`);
       });
     };
 
-    el.addEventListener('loadeddata', onLoaded);
-    el.addEventListener('canplay', onCanPlay);
+    el.addEventListener('loadeddata', onReady);
+    el.addEventListener('canplay', onReady);
+    if (el.readyState >= 2) onReady();
 
     return () => {
-      el.removeEventListener('loadeddata', onLoaded);
-      el.removeEventListener('canplay', onCanPlay);
+      el.removeEventListener('loadeddata', onReady);
+      el.removeEventListener('canplay', onReady);
     };
-  }, [currentIndex, videos, isMuted, syncPlayOverlay]);
+  }, [currentIndex, currentVideoId, isMuted, syncPlayOverlay, videos]);
 
   useEffect(() => {
     for (const video of videoRefs.current.values()) {
@@ -267,6 +270,7 @@ export function ReelsPlayer({
     if (!container) return;
     const index = Math.round(container.scrollTop / container.clientHeight);
     if (index !== currentIndex && index >= 0 && index < videos.length) {
+      userGestureRef.current = true;
       setCurrentIndex(index);
       onIndexChange?.(index);
     }
@@ -294,13 +298,23 @@ export function ReelsPlayer({
 
   const handleTap = (index: number) => {
     if (Date.now() - lastTapRef.current < 300) return;
+    userGestureRef.current = true;
     const el = videoRefs.current.get(index);
-    if (el && !el.paused) {
+    if (!el) return;
+
+    if (!el.paused) {
+      if (el.muted) {
+        el.muted = false;
+        setIsMuted(false);
+        void tryPlayVideo(el, 'tap-unmute');
+        return;
+      }
       userPausedRef.current = true;
       el.pause();
       syncPlayOverlay(index, 'user tap pause');
       return;
     }
+
     userPausedRef.current = false;
     playBlockedRef.current = false;
     void handlePlayButton(index);
@@ -313,30 +327,20 @@ export function ReelsPlayer({
       return;
     }
 
-    const nextMuted = false;
-    setIsMuted(nextMuted);
-    el.muted = nextMuted;
+    userGestureRef.current = true;
+    userPausedRef.current = false;
+    playBlockedRef.current = false;
+    setIsMuted(false);
+    el.muted = false;
     el.playsInline = true;
     el.setAttribute('playsinline', '');
     el.setAttribute('webkit-playsinline', '');
 
-    console.log(LOG, 'handlePlayButton: direct play()', { index, src: el.currentSrc });
-
-    try {
-      el.muted = false;
-      await el.play();
-      userPausedRef.current = false;
-      playBlockedRef.current = false;
-      syncPlayOverlay(index, 'handlePlayButton direct OK');
-      console.log(LOG, 'handlePlayButton: direct play OK', { paused: el.paused });
-    } catch (err) {
-      console.warn(LOG, 'handlePlayButton: direct play failed, fallback', {
-        error: err instanceof Error ? err.message : String(err),
-      });
-      const ok = await playWithFallback(el, `play-btn idx=${index}`);
-      playBlockedRef.current = !ok && el.paused;
-      syncPlayOverlay(index, `handlePlayButton fallback ok=${ok}`);
-    }
+    const ok = await playWithFallback(el, `play-btn idx=${index}`, { preferSound: true });
+    if (ok && !el.muted) setIsMuted(false);
+    else if (ok && el.muted) setIsMuted(true);
+    playBlockedRef.current = !ok && el.paused;
+    syncPlayOverlay(index, `handlePlayButton ok=${ok}`);
   };
 
   const handleLike = async (video: Video) => {
@@ -405,29 +409,9 @@ export function ReelsPlayer({
               className="h-full w-full object-cover"
               loop
               playsInline
-              muted={isMuted}
-              autoPlay
-              preload="auto"
-              onLoadedData={() => {
-                const el = videoRefs.current.get(index);
-                if (el && index === currentIndex) {
-                  void playWithFallback(el, `onLoadedData idx=${index}`).then((ok) => {
-                    if (!ok && el.paused) playBlockedRef.current = true;
-                    else if (!el.paused) playBlockedRef.current = false;
-                    syncPlayOverlay(index, `onLoadedData ok=${ok}`);
-                  });
-                }
-              }}
-              onCanPlay={() => {
-                const el = videoRefs.current.get(index);
-                if (el && index === currentIndex) {
-                  void playWithFallback(el, `onCanPlay prop idx=${index}`).then((ok) => {
-                    if (!ok && el.paused) playBlockedRef.current = true;
-                    else if (!el.paused) playBlockedRef.current = false;
-                    syncPlayOverlay(index, `onCanPlay ok=${ok}`);
-                  });
-                }
-              }}
+              muted={index === currentIndex ? isMuted : true}
+              autoPlay={index === currentIndex}
+              preload={index === currentIndex ? 'auto' : 'metadata'}
               onTimeUpdate={(e) => {
                 const el = e.currentTarget;
                 if (index !== currentIndex) return;
@@ -571,12 +555,15 @@ export function ReelsPlayer({
                 type="button"
                 onClick={(e) => {
                   e.stopPropagation();
+                  userGestureRef.current = true;
                   const nextMuted = !isMuted;
                   setIsMuted(nextMuted);
                   const el = videoRefs.current.get(currentIndex);
                   if (el) {
                     el.muted = nextMuted;
-                    void tryPlayVideo(el, 'mute-toggle');
+                    if (!nextMuted) {
+                      void tryPlayVideo(el, 'mute-toggle-unmute');
+                    }
                   }
                 }}
                 className="text-xl opacity-90"

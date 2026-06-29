@@ -26,6 +26,7 @@ export function ReelsOverlay() {
         startIndex={playbackIndex}
         controlledIndex={playbackIndex}
         onIndexChange={setPlaybackIndex}
+        immersive
       />
     </div>,
     document.body,
