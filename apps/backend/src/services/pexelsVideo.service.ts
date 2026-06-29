@@ -293,7 +293,7 @@ export async function fetchVideosForCategory(
   };
 
   const hasApi = Boolean(pexelsAuthKey() || config.pixabayApiKey);
-  const maxPages = hasApi ? 3 : 0;
+  const maxPages = hasApi ? Math.min(20, Math.ceil(targetCount / 35) + 1) : 0;
 
   for (let page = 1; page <= maxPages && collected.length < targetCount; page++) {
     add(await fetchPexels(query, 40, page));
@@ -302,17 +302,19 @@ export async function fetchVideosForCategory(
   }
 
   let i = 0;
-  while (collected.length < targetCount) {
+  while (collected.length < targetCount && i < targetCount * 2) {
     const base = FALLBACK_MP4[i % FALLBACK_MP4.length]!;
     const suffix = `${category}_${i}`;
-    add([
-      {
+    const uniqueUrl = `${base.mp4Url.split('?')[0]}?seed=${encodeURIComponent(suffix)}`;
+    if (!seen.has(uniqueUrl)) {
+      seen.add(uniqueUrl);
+      collected.push({
         ...base,
-        mp4Url: base.mp4Url,
+        mp4Url: uniqueUrl,
         thumbnailUrl: `https://picsum.photos/seed/${suffix}/720/1280`,
         title: `${base.title} — ${category}`,
-      },
-    ]);
+      });
+    }
     i++;
   }
 

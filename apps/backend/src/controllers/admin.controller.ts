@@ -5,7 +5,7 @@ let seedRunning = false;
 let lastSeedResult: Record<string, unknown> | null = null;
 let lastSeedError: string | null = null;
 
-export async function fetchVideosHandler(_req: Request, res: Response): Promise<void> {
+export async function fetchVideosHandler(req: Request, res: Response): Promise<void> {
   if (isFallbackMode()) {
     res.status(400).json({
       error: 'MongoDB required',
@@ -24,17 +24,24 @@ export async function fetchVideosHandler(_req: Request, res: Response): Promise<
     return;
   }
 
+  const wipeAll = req.body?.wipeAll !== false;
+  const targetTotal = Number(req.body?.targetTotal ?? 2310);
+  const perCategory = Number(req.body?.perCategory ?? Math.ceil(targetTotal / 18));
+
   seedRunning = true;
   lastSeedError = null;
 
   res.status(202).json({
     ok: true,
     running: true,
-    message: 'MP4 seed оғоз шуд (Pexels/Pixabay/fallback)',
+    wipeAll,
+    targetTotal,
+    perCategory,
+    message: `MP4 seed оғоз шуд — wipe=${wipeAll}, target=${targetTotal}`,
   });
 
   const { seedMp4Videos } = await import('../services/mp4VideoSeed.service.js');
-  void seedMp4Videos({ clearYoutube: false, perCategory: 25 })
+  void seedMp4Videos({ wipeAll, targetTotal, perCategory })
     .then((result) => {
       lastSeedResult = result;
       console.log('[mp4-seed] done', result);
