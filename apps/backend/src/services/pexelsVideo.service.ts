@@ -61,8 +61,15 @@ function pickMp4(files: PexelsFile[] | undefined): PexelsFile | null {
   return pool.sort((a, b) => (b.height ?? 0) - (a.height ?? 0))[0] ?? pool[0]!;
 }
 
+function pexelsAuthKey(): string {
+  const raw = config.pexelsApiKey.trim();
+  if (!raw) return '';
+  return raw.replace(/^Bearer\s+/i, '');
+}
+
 async function fetchPexels(query: string, perPage: number, page: number): Promise<PexelsVideoEntry[]> {
-  if (!config.pexelsApiKey) return [];
+  const apiKey = pexelsAuthKey();
+  if (!apiKey) return [];
 
   const url = new URL('https://api.pexels.com/videos/search');
   url.searchParams.set('query', query);
@@ -71,10 +78,13 @@ async function fetchPexels(query: string, perPage: number, page: number): Promis
   url.searchParams.set('orientation', 'portrait');
 
   const res = await fetch(url, {
-    headers: { Authorization: config.pexelsApiKey },
-    signal: AbortSignal.timeout(20_000),
+    headers: { Authorization: apiKey },
+    signal: AbortSignal.timeout(15_000),
   });
-  if (!res.ok) return [];
+  if (!res.ok) {
+    console.warn(`[pexels] ${res.status} for query="${query}" page=${page}`);
+    return [];
+  }
 
   const data = (await res.json()) as PexelsResponse;
   const out: PexelsVideoEntry[] = [];
@@ -282,7 +292,7 @@ export async function fetchVideosForCategory(
     }
   };
 
-  const hasApi = Boolean(config.pexelsApiKey || config.pixabayApiKey);
+  const hasApi = Boolean(pexelsAuthKey() || config.pixabayApiKey);
   const maxPages = hasApi ? 3 : 0;
 
   for (let page = 1; page <= maxPages && collected.length < targetCount; page++) {

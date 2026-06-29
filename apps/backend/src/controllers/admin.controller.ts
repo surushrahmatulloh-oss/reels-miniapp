@@ -1,9 +1,8 @@
 import type { Request, Response } from 'express';
-import { seedMp4Videos } from '../services/mp4VideoSeed.service.js';
 import { isFallbackMode } from '../store/fallback.js';
 
 let seedRunning = false;
-let lastSeedResult: Awaited<ReturnType<typeof seedMp4Videos>> | null = null;
+let lastSeedResult: Record<string, unknown> | null = null;
 let lastSeedError: string | null = null;
 
 export async function fetchVideosHandler(_req: Request, res: Response): Promise<void> {
@@ -34,6 +33,7 @@ export async function fetchVideosHandler(_req: Request, res: Response): Promise<
     message: 'MP4 seed оғоз шуд (Pexels/Pixabay/fallback)',
   });
 
+  const { seedMp4Videos } = await import('../services/mp4VideoSeed.service.js');
   void seedMp4Videos({ clearYoutube: false, perCategory: 25 })
     .then((result) => {
       lastSeedResult = result;

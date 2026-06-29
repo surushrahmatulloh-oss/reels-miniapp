@@ -9,27 +9,46 @@ import { fetchVideosForCategory, isPlayableMp4Url, FALLBACK_MP4 } from './pexels
 const VIDEOS_PER_CATEGORY = 80;
 
 async function fixDuplicateUrls(): Promise<number> {
-  const usedUrls = new Set(
-    (await Video.find({ url: { $not: { $regex: /youtube/i } } }).select('url').lean()).map((v) => v.url),
-  );
   const groups = await Video.aggregate<{ _id: string; ids: mongoose.Types.ObjectId[] }>([
     { $match: { url: { $not: { $regex: /youtube/i } } } },
     { $group: { _id: '$url', ids: { $push: '$_id' }, count: { $sum: 1 } } },
     { $match: { count: { $gt: 1 } } },
+    { $limit: 500 },
   ]);
+
+  if (!groups.length) return 0;
+
+  const usedUrls = new Set(
+    (await Video.find({ url: { $not: { $regex: /youtube/i } } }).select('url').lean()).map(
+      (v) => v.url,
+    ),
+  );
 
   let fixed = 0;
   let poolIdx = 0;
+
   for (const group of groups) {
     for (const id of group.ids.slice(1)) {
-      let newUrl = FALLBACK_MP4[poolIdx % FALLBACK_MP4.length]!.mp4Url;
-      while (usedUrls.has(newUrl)) {
+      let newUrl = '';
+      let attempts = 0;
+      const maxAttempts = FALLBACK_MP4.length * 2 + 5;
+
+      while (attempts < maxAttempts) {
+        const base = FALLBACK_MP4[poolIdx % FALLBACK_MP4.length]!.mp4Url;
+        const candidate =
+          attempts < FALLBACK_MP4.length ? base : `${base.split('?')[0]}?v=${id.toString()}`;
         poolIdx++;
-        newUrl = FALLBACK_MP4[poolIdx % FALLBACK_MP4.length]!.mp4Url;
+        attempts++;
+        if (!usedUrls.has(candidate)) {
+          newUrl = candidate;
+          break;
+        }
       }
+
+      if (!newUrl) continue;
+
       await Video.updateOne({ _id: id }, { $set: { url: newUrl } });
       usedUrls.add(newUrl);
-      poolIdx++;
       fixed++;
     }
   }

@@ -18,37 +18,20 @@ import adminRoutes from './routes/admin.routes.js';
 import { streamMedia } from './controllers/media.controller.js';
 import { setupSockets } from './sockets/index.js';
 import { videos, isFallbackMode } from './store/fallback.js';
-import { Video } from './models/Video.js';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
+const APP_VERSION = '4.3.3';
 
 async function main() {
   const app = express();
   app.set('trust proxy', 1);
   const server = http.createServer(app);
 
-  app.get('/health', async (_req, res) => {
-    let videoCount = videos.length;
-    let db = config.useMemoryDb ? 'memory' : 'mongodb';
-
-    if (isFallbackMode()) {
-      db = 'fallback';
-    } else if (Video.db.readyState === 1) {
-      try {
-        videoCount = await Video.countDocuments();
-      } catch {
-        /* ignore */
-      }
-    } else {
-      db = 'connecting';
-    }
-
+  // Lightweight health — no DB calls (Render health check must be instant)
+  app.get('/health', (_req, res) => {
     res.json({
       status: 'ok',
-      version: '4.3.2',
-      db,
-      videos: videoCount,
-      admin: true,
+      version: APP_VERSION,
       timestamp: new Date().toISOString(),
     });
   });
@@ -114,28 +97,13 @@ async function main() {
 
   await new Promise<void>((resolve) => {
     server.listen(config.port, '0.0.0.0', () => {
-      console.log(`Backend listening on 0.0.0.0:${config.port}`);
+      console.log(`Backend listening on 0.0.0.0:${config.port} v${APP_VERSION}`);
       resolve();
     });
   });
 
-  void connectDatabase().then(async () => {
-    console.log('Database ready');
-    if (!isFallbackMode()) {
-      try {
-        const { fixDuplicateUrls } = await import('./services/mp4VideoSeed.service.js');
-        const n = await fixDuplicateUrls();
-        if (n > 0) console.log(`Fixed ${n} duplicate video URLs`);
-      } catch (err) {
-        console.warn('URL dedupe skipped:', (err as Error).message);
-      }
-    }
-  });
-  try {
-    await connectRedis();
-  } catch {
-    console.warn('Redis unavailable — running without cache');
-  }
+  void connectDatabase().then(() => console.log('Database ready'));
+  void connectRedis().catch(() => console.warn('Redis unavailable — running without cache'));
 
   console.log('App routes ready');
 }
