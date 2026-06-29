@@ -41,9 +41,8 @@ export async function streamMedia(req: Request, res: Response): Promise<void> {
     return;
   }
 
-  // Direct MP4 — redirect for better range support & less server load
-  if (isPlayableMp4Url(sourceUrl) && !req.headers.range) {
-    res.redirect(302, sourceUrl);
+  if (!isPlayableMp4Url(sourceUrl)) {
+    res.status(415).json({ error: 'Not a playable MP4 URL' });
     return;
   }
 
@@ -72,6 +71,7 @@ export async function streamMedia(req: Request, res: Response): Promise<void> {
     if (contentLength) res.setHeader('Content-Length', contentLength);
     if (contentRange) res.setHeader('Content-Range', contentRange);
     res.setHeader('Cache-Control', 'public, max-age=86400');
+    res.setHeader('Access-Control-Allow-Origin', '*');
 
     Readable.fromWeb(upstream.body as import('stream/web').ReadableStream).pipe(res);
   } catch {

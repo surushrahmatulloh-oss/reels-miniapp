@@ -7,7 +7,7 @@ import { ReelsPlayer } from '@/components/ReelsPlayer';
 import { BottomNav } from '@/components/BottomNav';
 import { FeedSkeleton } from '@/components/Skeleton';
 
-const APP_VERSION = '4.2.0';
+const APP_VERSION = '4.3.0';
 
 export function ReelsPage() {
   useSocket();
@@ -49,7 +49,13 @@ export function ReelsPage() {
     if (!hasMore || loadingMoreRef.current || !nextCursor) return;
     loadingMoreRef.current = true;
     try {
-      const data = await getFeed({ limit: 15, cursor: nextCursor, format: 'reels' });
+      const loadedIds = useFeedStore.getState().videos.map((v) => v.id);
+      const data = await getFeed({
+        limit: 15,
+        cursor: nextCursor,
+        format: 'reels',
+        excludeIds: loadedIds,
+      });
       if (data.videos.length > 0) {
         setVideos(data.videos, true);
         setPagination(data.nextCursor, data.hasMore);

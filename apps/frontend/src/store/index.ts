@@ -2,7 +2,7 @@ import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
 import type { User, Video } from '@/types';
 import { setAuthToken } from '@/api/client';
-import { dedupeVideosById } from '@/utils/video';
+import { dedupeVideosByUrl } from '@/utils/video';
 
 interface AuthState {
   token: string | null;
@@ -71,7 +71,7 @@ export const useFeedStore = create<FeedState>((set, get) => ({
   setVideos: (videos, append = false) =>
     set((state) => {
       const merged = append ? [...state.videos, ...videos] : videos;
-      return { videos: dedupeVideosById(merged) };
+      return { videos: dedupeVideosByUrl(merged) };
     }),
   setCurrentIndex: (index) => set({ currentIndex: index }),
   setPlaybackIndex: (index) => set({ playbackIndex: index }),
@@ -89,7 +89,7 @@ export const useFeedStore = create<FeedState>((set, get) => ({
     window.Telegram?.WebApp?.expand?.();
     set({
       playbackOpen: true,
-      playbackVideos: dedupeVideosById(playbackVideos),
+      playbackVideos: dedupeVideosByUrl(playbackVideos),
       playbackIndex: startIndex,
     });
   },

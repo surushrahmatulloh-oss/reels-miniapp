@@ -11,6 +11,10 @@ import { getParam } from '../utils/params.js';
 export async function getFeed(req: AuthRequest, res: Response): Promise<void> {
   const cursor = req.query.cursor as string | undefined;
   const limit = Number(req.query.limit ?? 10);
+  const excludeIdsRaw = req.query.excludeIds as string | undefined;
+  const excludeIds = excludeIdsRaw
+    ? excludeIdsRaw.split(',').map((s) => s.trim()).filter(Boolean)
+    : [];
 
   if (isFallbackMode()) {
     res.json(fb.fallbackGetFeed(req.user!.userId, limit, cursor));
@@ -31,6 +35,7 @@ export async function getFeed(req: AuthRequest, res: Response): Promise<void> {
     format,
     cursor,
     limit,
+    excludeIds,
   });
 
   const videos = await enrichVideos(feed.videos, req.user!.userId);

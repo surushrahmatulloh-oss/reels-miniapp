@@ -35,21 +35,20 @@ function formatCount(n: number): string {
 }
 
 async function tryPlay(video: HTMLVideoElement, muted: boolean): Promise<boolean> {
-  video.muted = muted;
+  video.muted = true;
+  video.playsInline = true;
   try {
     await video.play();
+    if (!muted) video.muted = false;
     return true;
   } catch {
-    if (!muted) {
+    try {
       video.muted = true;
-      try {
-        await video.play();
-        return true;
-      } catch {
-        return false;
-      }
+      await video.play();
+      return true;
+    } catch {
+      return false;
     }
-    return false;
   }
 }
 
@@ -172,21 +171,18 @@ export function ReelsPlayer({
   };
 
   const handleTap = (index: number) => {
-    setTimeout(() => {
-      if (Date.now() - lastTapRef.current >= 280) {
-        const el = videoRefs.current.get(index);
-        if (!el) return;
-        if (el.paused || needsTap) {
-          void tryPlay(el, isMuted).then((ok) => {
-            setNeedsTap(!ok);
-            if (ok) setPlayingIndex(index);
-          });
-        } else {
-          el.pause();
-          setPlayingIndex(null);
-        }
-      }
-    }, 300);
+    if (Date.now() - lastTapRef.current < 300) return;
+    const el = videoRefs.current.get(index);
+    if (!el) return;
+    if (el.paused || needsTap) {
+      void tryPlay(el, isMuted).then((ok) => {
+        setNeedsTap(!ok);
+        if (ok) setPlayingIndex(index);
+      });
+    } else {
+      el.pause();
+      setPlayingIndex(null);
+    }
   };
 
   const handleLike = async (video: Video) => {
@@ -248,15 +244,17 @@ export function ReelsPlayer({
             <video
               ref={(el) => {
                 if (el) videoRefs.current.set(index, el);
+                else videoRefs.current.delete(index);
               }}
               src={getPlayableUrl(video)}
               poster={video.thumbnailUrl || undefined}
               className="h-full w-full object-cover"
               loop
               playsInline
-              autoPlay={index === currentIndex}
               muted={isMuted}
-              preload={index === currentIndex ? 'auto' : 'metadata'}
+              defaultMuted
+              autoPlay={index === currentIndex}
+              preload={index <= currentIndex + 1 ? 'auto' : 'metadata'}
               onLoadedData={() => {
                 if (index === currentIndex) void playVideo(index);
               }}
@@ -273,14 +271,25 @@ export function ReelsPlayer({
             />
 
             {needsTap && index === currentIndex && (
-              <div className="pointer-events-none absolute inset-0 flex items-center justify-center">
-                <span className="rounded-full bg-black/50 px-4 py-2 text-sm">▶ Пахш кунед</span>
-              </div>
+              <button
+                type="button"
+                className="absolute inset-0 z-20 flex items-center justify-center bg-black/20"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  const el = videoRefs.current.get(index);
+                  if (el) void tryPlay(el, isMuted).then((ok) => {
+                    setNeedsTap(!ok);
+                    if (ok) setPlayingIndex(index);
+                  });
+                }}
+              >
+                <span className="rounded-full bg-black/60 px-5 py-2.5 text-sm font-semibold">▶ Пахш кунед</span>
+              </button>
             )}
 
             <div className="pointer-events-none absolute inset-0 bg-gradient-to-b from-black/20 via-transparent to-black/60" />
 
-            <div className="absolute bottom-16 left-3 right-14 z-10">
+            <div className="absolute bottom-2 left-3 right-14 z-10">
               <div className="mb-2 flex items-center gap-2">
                 <img
                   src={video.authorAvatar || 'https://i.pravatar.cc/40'}
@@ -312,7 +321,7 @@ export function ReelsPlayer({
               )}
             </div>
 
-            <div className="absolute bottom-20 right-2 z-10 flex flex-col items-center gap-5">
+            <div className="absolute bottom-6 right-2 z-10 flex flex-col items-center gap-5">
               <ActionButton
                 icon={<IconHeart className="h-7 w-7" filled={video.isLiked} />}
                 active={video.isLiked}

@@ -82,8 +82,12 @@ export async function getFeed(params: {
   cursor?: string;
   limit?: number;
   format?: VideoFormat;
+  excludeIds?: string[];
 }): Promise<FeedResponse> {
-  const { data } = await api.get<FeedResponse>('/feed', { params });
+  const { excludeIds, ...rest } = params;
+  const query: Record<string, string | number | undefined> = { ...rest };
+  if (excludeIds?.length) query.excludeIds = excludeIds.join(',');
+  const { data } = await api.get<FeedResponse>('/feed', { params: query });
   return data;
 }
 

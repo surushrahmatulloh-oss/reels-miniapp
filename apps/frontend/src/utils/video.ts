@@ -1,13 +1,14 @@
 import type { Video } from '@/types';
 
+const API_URL = (import.meta.env.VITE_API_URL ?? '').replace(/\/$/, '');
+
 export function getPlayableUrl(video: Pick<Video, 'id' | 'url'> & { playUrl?: string }): string {
-  if (video.playUrl) return video.playUrl;
-  const url = video.url ?? '';
-  if (url.includes('/api/media/')) return url;
-  if (/\.mp4(\?|$)/i.test(url) || /videos\.pexels\.com|pixabay|commondatastorage/i.test(url)) {
-    return `/api/media/${video.id}.mp4`;
+  const path = video.playUrl ?? `/api/media/${video.id}.mp4`;
+  if (path.startsWith('http')) return path;
+  if (/youtube\.com|youtu\.be/i.test(video.url ?? '')) {
+    return API_URL ? `${API_URL}${path}` : path;
   }
-  return `/api/media/${video.id}.mp4`;
+  return API_URL ? `${API_URL}${path}` : path;
 }
 
 export function toVideo(partial: Partial<Video> & { id: string; playUrl?: string }): Video {
@@ -48,7 +49,15 @@ export function dedupeVideosById(videos: Video[]): Video[] {
   });
 }
 
-/** @deprecated use dedupeVideosById */
 export function dedupeVideosByUrl(videos: Video[]): Video[] {
-  return dedupeVideosById(videos);
+  const seenIds = new Set<string>();
+  const seenUrls = new Set<string>();
+  return videos.filter((v) => {
+    if (seenIds.has(v.id)) return false;
+    const mediaUrl = v.url || v.playUrl || '';
+    if (mediaUrl && seenUrls.has(mediaUrl)) return false;
+    seenIds.add(v.id);
+    if (mediaUrl) seenUrls.add(mediaUrl);
+    return true;
+  });
 }
