@@ -1,9 +1,14 @@
 import { Video } from '../models/Video.js';
 import { SEED_CATEGORIES } from '../data/youtubeSamplePool.js';
-import { fetchVideosForCategory, isPlayableMp4Url } from './pexelsVideo.service.js';
+import {
+  fetchVideosForCategory,
+  isFakeSeedUrl,
+  isPlayableMp4Url,
+  videoDedupeKey,
+} from './pexelsVideo.service.js';
 import { connectDatabase } from '../db.js';
 
-const TARGET_TOTAL = 1000;
+const TARGET_TOTAL = 2322;
 const INSERT_BATCH = 40;
 
 function isMp4Only(url: string): boolean {
@@ -36,7 +41,7 @@ export async function seedMp4Videos(options?: {
     console.log(`[mp4-seed] wiped ${deleted} videos`);
   }
 
-  const existingUrls = new Set<string>();
+  const existingKeys = new Set<string>();
   let added = 0;
   let skipped = 0;
   let globalIndex = 0;
@@ -44,12 +49,22 @@ export async function seedMp4Videos(options?: {
 
   for (const category of SEED_CATEGORIES) {
     byCategory[category] = 0;
-    const pool = await fetchVideosForCategory(category, perCategory, existingUrls);
+    const pool = await fetchVideosForCategory(category, perCategory, existingKeys);
     const docs = [];
 
     for (let j = 0; j < pool.length; j++) {
       const entry = pool[j]!;
-      if (!isPlayableMp4Url(entry.mp4Url) || !isMp4Only(entry.mp4Url)) {
+      if (
+        !isPlayableMp4Url(entry.mp4Url) ||
+        !isMp4Only(entry.mp4Url) ||
+        isFakeSeedUrl(entry.mp4Url)
+      ) {
+        skipped++;
+        continue;
+      }
+
+      const dedupeKey = videoDedupeKey(entry.mp4Url, entry.sourceId);
+      if (existingKeys.has(dedupeKey)) {
         skipped++;
         continue;
       }
@@ -78,7 +93,7 @@ export async function seedMp4Videos(options?: {
         createdAt: new Date(Date.now() - (added + docs.length) * 30_000),
       });
 
-      existingUrls.add(entry.mp4Url);
+      existingKeys.add(dedupeKey);
     }
 
     let categoryAdded = 0;

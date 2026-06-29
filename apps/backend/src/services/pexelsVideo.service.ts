@@ -7,6 +7,7 @@ export type PexelsVideoEntry = {
   author: string;
   width: number;
   height: number;
+  sourceId?: string;
 };
 
 const CATEGORY_QUERIES: Record<string, string> = {
@@ -30,6 +31,28 @@ const CATEGORY_QUERIES: Record<string, string> = {
   business: 'business office',
 };
 
+/** Extra search terms per category to reach unique video targets */
+const CATEGORY_QUERY_VARIANTS: Record<string, string[]> = {
+  music: ['music concert', 'musician performing', 'live music vertical'],
+  travel: ['travel adventure', 'city walking', 'beach travel vertical'],
+  food: ['cooking food', 'restaurant chef', 'street food vertical'],
+  sport: ['sport fitness', 'running workout', 'basketball vertical'],
+  tech: ['technology', 'smartphone tech', 'coding laptop vertical'],
+  comedy: ['funny people', 'comedy sketch', 'friends laughing vertical'],
+  fashion: ['fashion model', 'street fashion', 'makeup beauty vertical'],
+  nature: ['nature landscape', 'forest trees', 'ocean waves vertical'],
+  education: ['education study', 'student classroom', 'library reading vertical'],
+  dance: ['dance', 'hip hop dance', 'ballet performance vertical'],
+  cooking: ['chef cooking', 'kitchen recipe', 'baking vertical'],
+  fitness: ['workout gym', 'yoga stretch', 'home exercise vertical'],
+  animals: ['wild animals', 'pets dogs', 'birds nature vertical'],
+  art: ['art creative', 'painting artist', 'street art vertical'],
+  gaming: ['gaming', 'esports player', 'video game vertical'],
+  news: ['city street', 'urban life', 'people walking vertical'],
+  health: ['yoga wellness', 'meditation calm', 'healthy lifestyle vertical'],
+  business: ['business office', 'meeting work', 'entrepreneur vertical'],
+};
+
 type PexelsFile = { quality?: string; file_type?: string; link?: string; width?: number; height?: number };
 type PexelsVideo = {
   id: number;
@@ -49,8 +72,17 @@ type PixabayHit = {
   user?: string;
   tags?: string;
   pageURL?: string;
+  id?: number;
 };
 type PixabayResponse = { hits?: PixabayHit[] };
+
+const API_PAGE_SIZE = 80;
+const MAX_PAGES_PER_QUERY = 80;
+const REQUEST_DELAY_MS = 180;
+
+function sleep(ms: number): Promise<void> {
+  return new Promise((resolve) => setTimeout(resolve, ms));
+}
 
 function pickMp4(files: PexelsFile[] | undefined): PexelsFile | null {
   if (!files?.length) return null;
@@ -67,6 +99,34 @@ function pexelsAuthKey(): string {
   return raw.replace(/^Bearer\s+/i, '');
 }
 
+/** Dedupe key: prefer Pexels/Pixabay asset id over full CDN URL */
+export function videoDedupeKey(url: string, sourceId?: string): string {
+  if (sourceId) return sourceId;
+  const pexels = url.match(/video-files\/(\d+)\//i);
+  if (pexels) return `pexels:${pexels[1]}`;
+  const pixabay = url.match(/cdn\.pixabay\.com\/video\/(\d+)\//i);
+  if (pixabay) return `pixabay:${pixabay[1]}`;
+  return url.split('?')[0]!;
+}
+
+export function isFakeSeedUrl(url: string): boolean {
+  return /\?seed=/i.test(url);
+}
+
+function mapPexelsVideo(v: PexelsVideo, query: string): PexelsVideoEntry | null {
+  const file = pickMp4(v.video_files);
+  if (!file?.link) return null;
+  return {
+    mp4Url: file.link.split('?')[0]!,
+    thumbnailUrl: v.image ?? '',
+    title: query,
+    author: v.user?.name ?? 'Pexels',
+    width: file.width ?? 720,
+    height: file.height ?? 1280,
+    sourceId: `pexels:${v.id}`,
+  };
+}
+
 async function fetchPexels(query: string, perPage: number, page: number): Promise<PexelsVideoEntry[]> {
   const apiKey = pexelsAuthKey();
   if (!apiKey) return [];
@@ -79,7 +139,7 @@ async function fetchPexels(query: string, perPage: number, page: number): Promis
 
   const res = await fetch(url, {
     headers: { Authorization: apiKey },
-    signal: AbortSignal.timeout(15_000),
+    signal: AbortSignal.timeout(20_000),
   });
   if (!res.ok) {
     console.warn(`[pexels] ${res.status} for query="${query}" page=${page}`);
@@ -90,16 +150,36 @@ async function fetchPexels(query: string, perPage: number, page: number): Promis
   const out: PexelsVideoEntry[] = [];
 
   for (const v of data.videos ?? []) {
-    const file = pickMp4(v.video_files);
-    if (!file?.link) continue;
-    out.push({
-      mp4Url: file.link,
-      thumbnailUrl: v.image ?? '',
-      title: query,
-      author: v.user?.name ?? 'Pexels',
-      width: file.width ?? 720,
-      height: file.height ?? 1280,
-    });
+    const entry = mapPexelsVideo(v, query);
+    if (entry) out.push(entry);
+  }
+  return out;
+}
+
+async function fetchPexelsPopular(perPage: number, page: number): Promise<PexelsVideoEntry[]> {
+  const apiKey = pexelsAuthKey();
+  if (!apiKey) return [];
+
+  const url = new URL('https://api.pexels.com/videos/popular');
+  url.searchParams.set('per_page', String(perPage));
+  url.searchParams.set('page', String(page));
+
+  const res = await fetch(url, {
+    headers: { Authorization: apiKey },
+    signal: AbortSignal.timeout(20_000),
+  });
+  if (!res.ok) {
+    console.warn(`[pexels] popular ${res.status} page=${page}`);
+    return [];
+  }
+
+  const data = (await res.json()) as PexelsResponse;
+  const out: PexelsVideoEntry[] = [];
+  for (const v of data.videos ?? []) {
+    const entry = mapPexelsVideo(v, 'popular');
+    if (!entry) continue;
+    if ((entry.height ?? 0) < (entry.width ?? 0)) continue;
+    out.push(entry);
   }
   return out;
 }
@@ -123,209 +203,120 @@ async function fetchPixabay(query: string, perPage: number, page: number): Promi
   for (const hit of data.hits ?? []) {
     const v = hit.videos?.large ?? hit.videos?.medium ?? hit.videos?.small ?? hit.videos?.tiny;
     if (!v?.url) continue;
+    if ((v.height ?? 0) < (v.width ?? 0)) continue;
     out.push({
-      mp4Url: v.url,
+      mp4Url: v.url.split('?')[0]!,
       thumbnailUrl: hit.pageURL ?? '',
       title: hit.tags ?? query,
       author: hit.user ?? 'Pixabay',
       width: v.width ?? 720,
       height: v.height ?? 1280,
+      sourceId: hit.id != null ? `pixabay:${hit.id}` : undefined,
     });
   }
   return out;
 }
 
-/** Built-in MP4 samples (always work in HTML5 video) */
-const FALLBACK_MP4: PexelsVideoEntry[] = [
-  {
-    mp4Url: 'https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/ForBiggerBlazes.mp4',
-    thumbnailUrl: 'https://picsum.photos/seed/r1/720/1280',
-    title: 'Blazes',
-    author: 'Sample',
-    width: 1280,
-    height: 720,
-  },
-  {
-    mp4Url: 'https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/ForBiggerEscapes.mp4',
-    thumbnailUrl: 'https://picsum.photos/seed/r2/720/1280',
-    title: 'Escapes',
-    author: 'Sample',
-    width: 1280,
-    height: 720,
-  },
-  {
-    mp4Url: 'https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/ForBiggerFun.mp4',
-    thumbnailUrl: 'https://picsum.photos/seed/r3/720/1280',
-    title: 'Fun',
-    author: 'Sample',
-    width: 1280,
-    height: 720,
-  },
-  {
-    mp4Url: 'https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/ForBiggerJoyrides.mp4',
-    thumbnailUrl: 'https://picsum.photos/seed/r4/720/1280',
-    title: 'Joyrides',
-    author: 'Sample',
-    width: 1280,
-    height: 720,
-  },
-  {
-    mp4Url: 'https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/ForBiggerMeltdowns.mp4',
-    thumbnailUrl: 'https://picsum.photos/seed/r5/720/1280',
-    title: 'Meltdowns',
-    author: 'Sample',
-    width: 1280,
-    height: 720,
-  },
-  {
-    mp4Url: 'https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/Sintel.mp4',
-    thumbnailUrl: 'https://picsum.photos/seed/r6/720/1280',
-    title: 'Sintel',
-    author: 'Sample',
-    width: 1280,
-    height: 720,
-  },
-  {
-    mp4Url: 'https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/BigBuckBunny.mp4',
-    thumbnailUrl: 'https://picsum.photos/seed/r7/720/1280',
-    title: 'Bunny',
-    author: 'Sample',
-    width: 1280,
-    height: 720,
-  },
-  {
-    mp4Url: 'https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/ElephantsDream.mp4',
-    thumbnailUrl: 'https://picsum.photos/seed/r8/720/1280',
-    title: 'Dream',
-    author: 'Sample',
-    width: 1280,
-    height: 720,
-  },
-  {
-    mp4Url: 'https://interactive-examples.mdn.mozilla.net/media/cc0-videos/flower.mp4',
-    thumbnailUrl: 'https://picsum.photos/seed/r9/720/1280',
-    title: 'Flower',
-    author: 'MDN',
-    width: 720,
-    height: 1280,
-  },
-  {
-    mp4Url: 'https://interactive-examples.mdn.mozilla.net/media/cc0-videos/friday.mp4',
-    thumbnailUrl: 'https://picsum.photos/seed/r10/720/1280',
-    title: 'Friday',
-    author: 'MDN',
-    width: 720,
-    height: 1280,
-  },
-  {
-    mp4Url: 'https://videos.pexels.com/video-files/3195394/3195394-uhd_1440_2732_25fps.mp4',
-    thumbnailUrl: 'https://images.pexels.com/videos/3195394/pictures/preview-0.jpg',
-    title: 'Ocean waves',
-    author: 'Pexels',
-    width: 1440,
-    height: 2732,
-  },
-  {
-    mp4Url: 'https://videos.pexels.com/video-files/854021/854021-hd_720_1366_25fps.mp4',
-    thumbnailUrl: 'https://images.pexels.com/videos/854021/pictures/preview-0.jpg',
-    title: 'City night',
-    author: 'Pexels',
-    width: 720,
-    height: 1366,
-  },
-  {
-    mp4Url: 'https://videos.pexels.com/video-files/4763824/4763824-hd_1080_1920_30fps.mp4',
-    thumbnailUrl: 'https://images.pexels.com/videos/4763824/pictures/preview-0.jpg',
-    title: 'Fitness',
-    author: 'Pexels',
-    width: 1080,
-    height: 1920,
-  },
-  {
-    mp4Url: 'https://videos.pexels.com/video-files/4057259/4057259-hd_1080_1920_25fps.mp4',
-    thumbnailUrl: 'https://images.pexels.com/videos/4057259/pictures/preview-0.jpg',
-    title: 'Cooking',
-    author: 'Pexels',
-    width: 1080,
-    height: 1920,
-  },
-  {
-    mp4Url: 'https://videos.pexels.com/video-files/3045163/3045163-hd_1080_1920_30fps.mp4',
-    thumbnailUrl: 'https://images.pexels.com/videos/3045163/pictures/preview-0.jpg',
-    title: 'Travel',
-    author: 'Pexels',
-    width: 1080,
-    height: 1920,
-  },
-  {
-    mp4Url: 'https://videos.pexels.com/video-files/2098989/2098989-hd_1080_1920_30fps.mp4',
-    thumbnailUrl: 'https://images.pexels.com/videos/2098989/pictures/preview-0.jpg',
-    title: 'Dance',
-    author: 'Pexels',
-    width: 1080,
-    height: 1920,
-  },
-  {
-    mp4Url: 'https://videos.pexels.com/video-files/2491284/2491284-hd_1080_1920_25fps.mp4',
-    thumbnailUrl: 'https://images.pexels.com/videos/2491284/pictures/preview-0.jpg',
-    title: 'Nature',
-    author: 'Pexels',
-    width: 1080,
-    height: 1920,
-  },
-];
+async function collectFromPagedFetcher(
+  fetchPage: (page: number) => Promise<PexelsVideoEntry[]>,
+  targetCount: number,
+  seen: Set<string>,
+  collected: PexelsVideoEntry[],
+): Promise<void> {
+  let emptyStreak = 0;
+  for (let page = 1; page <= MAX_PAGES_PER_QUERY && collected.length < targetCount; page++) {
+    const items = await fetchPage(page);
+    if (!items.length) {
+      emptyStreak++;
+      if (emptyStreak >= 2) break;
+      await sleep(REQUEST_DELAY_MS);
+      continue;
+    }
+    emptyStreak = 0;
+
+    for (const item of items) {
+      if (isFakeSeedUrl(item.mp4Url)) continue;
+      const key = videoDedupeKey(item.mp4Url, item.sourceId);
+      if (seen.has(key)) continue;
+      seen.add(key);
+      collected.push(item);
+      if (collected.length >= targetCount) return;
+    }
+
+    await sleep(REQUEST_DELAY_MS);
+  }
+}
 
 export async function fetchVideosForCategory(
   category: string,
   targetCount: number,
   globalSeen?: Set<string>,
 ): Promise<PexelsVideoEntry[]> {
-  const query = CATEGORY_QUERIES[category] ?? category;
+  const queries = CATEGORY_QUERY_VARIANTS[category] ?? [CATEGORY_QUERIES[category] ?? category];
   const collected: PexelsVideoEntry[] = [];
   const seen = globalSeen ?? new Set<string>();
 
-  const add = (items: PexelsVideoEntry[]) => {
-    for (const item of items) {
-      if (seen.has(item.mp4Url)) continue;
-      seen.add(item.mp4Url);
-      collected.push(item);
-      if (collected.length >= targetCount) break;
-    }
-  };
+  const hasPexels = Boolean(pexelsAuthKey());
+  const hasPixabay = Boolean(config.pixabayApiKey);
 
-  const hasApi = Boolean(pexelsAuthKey() || config.pixabayApiKey);
-  const maxPages = hasApi ? Math.min(20, Math.ceil(targetCount / 35) + 1) : 0;
-
-  for (let page = 1; page <= maxPages && collected.length < targetCount; page++) {
-    add(await fetchPexels(query, 40, page));
-    if (collected.length >= targetCount) break;
-    add(await fetchPixabay(query, 40, page));
+  if (!hasPexels && !hasPixabay) {
+    console.error(
+      `[pexels] PEXELS_API_KEY ё PIXABAY_API_KEY зарур аст — seed бе API танҳо URL-ҳои такрорӣ месозад.`,
+    );
+    return [];
   }
 
-  let i = 0;
-  while (collected.length < targetCount && i < targetCount * 2) {
-    const base = FALLBACK_MP4[i % FALLBACK_MP4.length]!;
-    const suffix = `${category}_${i}`;
-    const uniqueUrl = `${base.mp4Url.split('?')[0]}?seed=${encodeURIComponent(suffix)}`;
-    if (!seen.has(uniqueUrl)) {
-      seen.add(uniqueUrl);
-      collected.push({
-        ...base,
-        mp4Url: uniqueUrl,
-        thumbnailUrl: `https://picsum.photos/seed/${suffix}/720/1280`,
-        title: `${base.title} — ${category}`,
-      });
+  if (hasPexels) {
+    for (const query of queries) {
+      if (collected.length >= targetCount) break;
+      await collectFromPagedFetcher(
+        (page) => fetchPexels(query, API_PAGE_SIZE, page),
+        targetCount,
+        seen,
+        collected,
+      );
     }
-    i++;
+
+    if (collected.length < targetCount) {
+      await collectFromPagedFetcher(
+        (page) => fetchPexelsPopular(API_PAGE_SIZE, page),
+        targetCount,
+        seen,
+        collected,
+      );
+    }
+  }
+
+  if (hasPixabay && collected.length < targetCount) {
+    for (const query of queries) {
+      if (collected.length >= targetCount) break;
+      await collectFromPagedFetcher(
+        (page) => fetchPixabay(query, Math.min(API_PAGE_SIZE, 200), page),
+        targetCount,
+        seen,
+        collected,
+      );
+    }
+  }
+
+  if (collected.length < targetCount) {
+    console.warn(
+      `[pexels] ${category}: ${collected.length}/${targetCount} unique API videos (no fake ?seed= padding)`,
+    );
   }
 
   return collected.slice(0, targetCount);
 }
 
 export function isPlayableMp4Url(url: string): boolean {
-  if (!url) return false;
+  if (!url || isFakeSeedUrl(url)) return false;
   if (/youtube\.com|youtu\.be/i.test(url)) return false;
-  return /\.mp4(\?|$)/i.test(url) || /videos\.pexels\.com|cdn\.pixabay\.com|commondatastorage\.googleapis\.com|interactive-examples\.mdn/i.test(url);
+  return (
+    /\.mp4(\?|$)/i.test(url) ||
+    /videos\.pexels\.com|cdn\.pixabay\.com|commondatastorage\.googleapis\.com|interactive-examples\.mdn/i.test(
+      url,
+    )
+  );
 }
 
-export { CATEGORY_QUERIES, FALLBACK_MP4 };
+export { CATEGORY_QUERIES };

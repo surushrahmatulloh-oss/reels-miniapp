@@ -1,5 +1,5 @@
 /**
- * POST /api/admin/fetch-videos — wipe DB + seed 1000 MP4 videos
+ * POST /api/admin/fetch-videos — wipe DB + seed 2322 unique Pexels MP4 videos
  */
 import { existsSync, readFileSync } from 'fs';
 import path from 'path';
@@ -37,12 +37,12 @@ const headers = {
   'x-admin-key': adminKey,
 };
 
-console.log(`POST ${RENDER_URL}/api/admin/fetch-videos (wipeAll + 1000 MP4)...`);
+console.log(`POST ${RENDER_URL}/api/admin/fetch-videos (wipeAll + 2322 unique Pexels MP4)...`);
 
 const res = await fetch(`${RENDER_URL}/api/admin/fetch-videos`, {
   method: 'POST',
   headers,
-  body: JSON.stringify({ wipeAll: true, targetTotal: 1000, perCategory: 56 }),
+  body: JSON.stringify({ wipeAll: true, targetTotal: 2322, perCategory: 129 }),
 });
 
 const text = await res.text();
@@ -55,7 +55,7 @@ try {
 
 if (!res.ok && res.status !== 202) process.exit(1);
 
-for (let i = 0; i < 90; i++) {
+for (let i = 0; i < 240; i++) {
   await new Promise((r) => setTimeout(r, 5000));
   const statusRes = await fetch(`${RENDER_URL}/api/admin/seed-status`, { headers });
   const raw = await statusRes.text();
