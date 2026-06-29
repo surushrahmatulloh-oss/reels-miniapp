@@ -278,10 +278,11 @@ const FALLBACK_MP4: PexelsVideoEntry[] = [
 export async function fetchVideosForCategory(
   category: string,
   targetCount: number,
+  globalSeen?: Set<string>,
 ): Promise<PexelsVideoEntry[]> {
   const query = CATEGORY_QUERIES[category] ?? category;
   const collected: PexelsVideoEntry[] = [];
-  const seen = new Set<string>();
+  const seen = globalSeen ?? new Set<string>();
 
   const add = (items: PexelsVideoEntry[]) => {
     for (const item of items) {

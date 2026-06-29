@@ -50,11 +50,12 @@ export async function seedMp4Videos(options?: {
   const existingUrls = new Set<string>();
   let added = 0;
   let skipped = 0;
+  let globalIndex = 0;
   const byCategory: Record<string, number> = {};
 
   for (const category of SEED_CATEGORIES) {
     byCategory[category] = 0;
-    const pool = await fetchVideosForCategory(category, perCategory);
+    const pool = await fetchVideosForCategory(category, perCategory, existingUrls);
     const docs = [];
 
     for (let j = 0; j < pool.length; j++) {
@@ -64,12 +65,12 @@ export async function seedMp4Videos(options?: {
         continue;
       }
 
-      const hash = Buffer.from(`${category}_${entry.mp4Url}_${j}`)
-        .toString('base64url')
-        .slice(0, 20);
+      globalIndex++;
+      const hash = Buffer.from(`${globalIndex}_${category}_${entry.mp4Url}`)
+        .toString('base64url');
 
       docs.push({
-        instagramId: `mp4_${category}_${hash}`,
+        instagramId: `mp4_${String(globalIndex).padStart(5, '0')}_${category}_${hash.slice(0, 12)}`,
         url: entry.mp4Url,
         thumbnailUrl: entry.thumbnailUrl || `https://picsum.photos/seed/${hash}/720/1280`,
         title: entry.title,
@@ -89,17 +90,26 @@ export async function seedMp4Videos(options?: {
       });
 
       existingUrls.add(entry.mp4Url);
-      byCategory[category]!++;
     }
 
     if (docs.length > 0) {
-      await Video.insertMany(docs, { ordered: false }).catch((err: { code?: number }) => {
-        if (err.code !== 11000) throw err;
-      });
-      added += docs.length;
+      try {
+        const inserted = await Video.insertMany(docs, { ordered: false });
+        added += inserted.length;
+        byCategory[category] = inserted.length;
+      } catch (err: unknown) {
+        const bulk = err as { code?: number; insertedDocs?: unknown[]; result?: { insertedCount?: number } };
+        if (bulk.code === 11000) {
+          const n = bulk.insertedDocs?.length ?? bulk.result?.insertedCount ?? 0;
+          added += n;
+          byCategory[category] = n;
+        } else {
+          throw err;
+        }
+      }
     }
 
-    console.log(`[mp4-seed] ${category}: +${docs.length}`);
+    console.log(`[mp4-seed] ${category}: +${byCategory[category]}`);
   }
 
   const total = await Video.countDocuments();
