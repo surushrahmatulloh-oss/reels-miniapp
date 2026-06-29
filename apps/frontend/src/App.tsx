@@ -9,6 +9,8 @@ import { OnboardingPage } from '@/pages/OnboardingPage';
 import { FeedPage } from '@/pages/FeedPage';
 import { ProfilePage } from '@/pages/ProfilePage';
 import { SearchPage } from '@/pages/SearchPage';
+import { CreatePage } from '@/pages/CreatePage';
+import { NotificationsPage } from '@/pages/NotificationsPage';
 import { ReelsOverlay } from '@/components/ReelsOverlay';
 
 const queryClient = new QueryClient({
@@ -74,6 +76,8 @@ function AppRoutes() {
     <Routes>
       <Route path="/feed" element={<FeedPage />} />
       <Route path="/search" element={<SearchPage />} />
+      <Route path="/create" element={<CreatePage />} />
+      <Route path="/notifications" element={<NotificationsPage />} />
       <Route path="/profile" element={<ProfilePage />} />
       <Route path="*" element={<Navigate to="/feed" replace />} />
     </Routes>

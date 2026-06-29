@@ -17,9 +17,13 @@ const SEED_CATEGORIES = [
   'comedy',
   'fashion',
   'nature',
+  'education',
+  'dance',
+  'cooking',
+  'fitness',
 ];
 
-const VIDEOS_PER_CATEGORY = 63;
+const VIDEOS_PER_CATEGORY = 42;
 
 /** YouTube RSS user= feeds (verified working) */
 const USER_CHANNELS_BY_CATEGORY = {
@@ -45,6 +49,10 @@ const USER_CHANNELS_BY_CATEGORY = {
   comedy: ['CollegeHumor', 'ComedyCentral', 'FailArmy', 'funnyordie', 'Smosh', 'PewDiePie', 'SmoshGames'],
   fashion: ['ELLE', 'FashionNova', 'iJustine', 'Vogue', 'GQ', 'WIRED', 'TheVerge'],
   nature: ['BBCEarth', 'Discovery', 'MinuteEarth', 'BBC', 'HistoryChannel', 'SciShow', 'AsapSCIENCE'],
+  education: ['KhanAcademy', 'CrashCourse', 'Numberphile', 'Vsauce', 'minutephysics', 'TED'],
+  dance: ['RedBull', 'BTS', 'Smosh', 'PewDiePie'],
+  cooking: ['GordonRamsay', 'Babish', 'JamieOliver', 'SeriousEats', 'BonAppetit'],
+  fitness: ['Nike', 'UFC', 'NBA', 'RedBull'],
 };
 
 /** Extra channels used to fill categories below 63 videos */

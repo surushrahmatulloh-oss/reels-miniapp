@@ -104,9 +104,24 @@ export async function getComments(videoId: string): Promise<Comment[]> {
   return data.comments;
 }
 
-export async function addComment(videoId: string, text: string): Promise<Comment> {
-  const { data } = await api.post<{ comment: Comment }>(`/videos/${videoId}/comments`, { text });
+export async function addComment(
+  videoId: string,
+  text: string,
+  parentId?: string,
+): Promise<Comment> {
+  const { data } = await api.post<{ comment: Comment }>(`/videos/${videoId}/comments`, {
+    text,
+    parentId,
+  });
   return data.comment;
+}
+
+export async function likeComment(
+  videoId: string,
+  commentId: string,
+): Promise<{ liked: boolean; likes: number }> {
+  const { data } = await api.post(`/videos/${videoId}/comments/${commentId}/like`);
+  return data;
 }
 
 export async function getProfile(username: string): Promise<{

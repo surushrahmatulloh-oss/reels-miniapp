@@ -4,6 +4,13 @@ export default {
   theme: {
     extend: {
       colors: {
+        ig: {
+          bg: '#000000',
+          surface: '#121212',
+          border: '#262626',
+          muted: '#8e8e8e',
+          link: '#0095f6',
+        },
         tg: {
           bg: 'var(--tg-theme-bg-color, #0a0a0a)',
           text: 'var(--tg-theme-text-color, #ffffff)',

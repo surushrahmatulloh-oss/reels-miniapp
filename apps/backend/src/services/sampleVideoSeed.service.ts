@@ -55,7 +55,7 @@ export async function seedSampleVideos(options?: { clear?: boolean }): Promise<{
 
       docs.push({
         youtubeId: entry.id,
-        instagramId: `yt_${entry.id}`,
+        instagramId: `yt_${category}_${entry.id}`,
         url: `https://www.youtube.com/embed/${entry.id}`,
         thumbnailUrl: thumbnailUrl(entry.id),
         title: entry.title,

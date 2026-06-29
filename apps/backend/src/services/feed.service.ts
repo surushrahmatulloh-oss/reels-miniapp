@@ -7,17 +7,17 @@ import type { VideoFormat } from '../types/index.js';
 
 const CATEGORIES = [
   'music',
-  'sport',
-  'nature',
-  'food',
   'travel',
+  'food',
+  'sport',
+  'tech',
+  'comedy',
   'fashion',
-  'technology',
-  'animation',
-  'entertainment',
+  'nature',
   'education',
-  'business',
-  'science',
+  'dance',
+  'cooking',
+  'fitness',
 ];
 
 export { CATEGORIES };

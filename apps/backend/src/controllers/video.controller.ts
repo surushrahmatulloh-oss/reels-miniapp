@@ -166,28 +166,59 @@ export async function getComments(req: AuthRequest, res: Response): Promise<void
     .limit(50)
     .lean();
 
-  const userIds = [...new Set(comments.map((c) => c.userId.toString()))];
+  const commentIds = comments.map((c) => c._id);
+  const replies = await Comment.find({ videoId, parentId: { $in: commentIds } })
+    .sort({ createdAt: 1 })
+    .lean();
+
+  const userIds = [
+    ...new Set([
+      ...comments.map((c) => c.userId.toString()),
+      ...replies.map((c) => c.userId.toString()),
+    ]),
+  ];
   const users = await User.find({ _id: { $in: userIds } }).lean();
   const userMap = new Map(users.map((u) => [u._id.toString(), u]));
 
+  const likedComments = await CommentLike.find({
+    userId: req.user!.userId,
+    commentId: { $in: [...commentIds, ...replies.map((r) => r._id)] },
+  }).lean();
+  const likedSet = new Set(likedComments.map((l) => l.commentId.toString()));
+
+  const mapComment = (c: (typeof comments)[0]) => {
+    const user = userMap.get(c.userId.toString());
+    return {
+      id: c._id.toString(),
+      text: c.text,
+      likes: c.likes,
+      createdAt: c.createdAt,
+      parentId: c.parentId?.toString() ?? null,
+      isLiked: likedSet.has(c._id.toString()),
+      user: user
+        ? {
+            id: user._id.toString(),
+            username: user.username,
+            avatarUrl: user.avatarUrl,
+            displayName: user.displayName,
+          }
+        : null,
+    };
+  };
+
+  const repliesByParent = new Map<string, ReturnType<typeof mapComment>[]>();
+  for (const r of replies) {
+    const pid = r.parentId?.toString() ?? '';
+    const list = repliesByParent.get(pid) ?? [];
+    list.push(mapComment(r));
+    repliesByParent.set(pid, list);
+  }
+
   res.json({
-    comments: comments.map((c) => {
-      const user = userMap.get(c.userId.toString());
-      return {
-        id: c._id.toString(),
-        text: c.text,
-        likes: c.likes,
-        createdAt: c.createdAt,
-        user: user
-          ? {
-              id: user._id.toString(),
-              username: user.username,
-              avatarUrl: user.avatarUrl,
-              displayName: user.displayName,
-            }
-          : null,
-      };
-    }),
+    comments: comments.map((c) => ({
+      ...mapComment(c),
+      replies: repliesByParent.get(c._id.toString()) ?? [],
+    })),
   });
 }
 
@@ -225,7 +256,9 @@ export async function addComment(req: AuthRequest, res: Response): Promise<void>
     videoId,
     userId: req.user!.userId,
     text: parsed.data.text,
-    parentId: parsed.data.parentId ?? null,
+    parentId: parsed.data.parentId
+      ? new mongoose.Types.ObjectId(parsed.data.parentId)
+      : null,
   });
 
   await Video.findByIdAndUpdate(videoId, { $inc: { commentsCount: 1 } });
@@ -237,6 +270,8 @@ export async function addComment(req: AuthRequest, res: Response): Promise<void>
     text: comment.text,
     likes: 0,
     createdAt: comment.createdAt,
+    parentId: comment.parentId?.toString() ?? null,
+    isLiked: false,
     user: user
       ? {
           id: user._id.toString(),

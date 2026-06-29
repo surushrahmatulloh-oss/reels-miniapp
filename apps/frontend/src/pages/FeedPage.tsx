@@ -1,13 +1,14 @@
-import { useCallback, useEffect } from 'react';
+import { useEffect, useCallback } from 'react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { getFeed } from '@/api/client';
 import { useFeedStore } from '@/store';
 import { useSocket } from '@/hooks';
 import { ReelsPlayer } from '@/components/ReelsPlayer';
 import { BottomNav } from '@/components/BottomNav';
-import { LoadingScreen } from '@/components/LoadingScreen';
+import { StoriesBar } from '@/components/StoriesBar';
+import { FeedSkeleton } from '@/components/Skeleton';
 
-const APP_VERSION = '2.3.1';
+const APP_VERSION = '3.0.0';
 
 export function FeedPage() {
   useSocket();
@@ -20,9 +21,6 @@ export function FeedPage() {
       useFeedStore.getState().setVideos([]);
       useFeedStore.getState().setCurrentIndex(0);
       void queryClient.invalidateQueries({ queryKey: ['feed'] });
-      void queryClient.invalidateQueries({ queryKey: ['search-videos'] });
-      void queryClient.invalidateQueries({ queryKey: ['saved'] });
-      void queryClient.invalidateQueries({ queryKey: ['liked'] });
     }
   }, [queryClient]);
 
@@ -54,12 +52,20 @@ export function FeedPage() {
   }, [hasMore, isFetching, nextCursor, setVideos, setPagination]);
 
   if (isLoading && videos.length === 0) {
-    return <LoadingScreen message="Лента бор мешавад..." />;
+    return (
+      <div className="relative h-full pb-14">
+        <FeedSkeleton />
+        <BottomNav />
+      </div>
+    );
   }
 
   return (
-    <div className="relative h-full pb-16">
-      <ReelsPlayer videos={videos} onLoadMore={() => void loadMore()} />
+    <div className="relative flex h-full flex-col bg-black pb-14">
+      <StoriesBar videos={videos} />
+      <div className="relative min-h-0 flex-1">
+        <ReelsPlayer videos={videos} onLoadMore={() => void loadMore()} />
+      </div>
       <BottomNav />
     </div>
   );

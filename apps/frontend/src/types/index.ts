@@ -48,6 +48,9 @@ export interface Comment {
   text: string;
   likes: number;
   createdAt: string;
+  isLiked?: boolean;
+  parentId?: string | null;
+  replies?: Comment[];
   user: {
     id: string;
     username: string;
@@ -69,18 +72,18 @@ export interface FeedResponse {
 }
 
 export const CATEGORIES = [
-  { id: 'music', label: 'Мусики', emoji: '🎵' },
-  { id: 'sport', label: 'Варзиш', emoji: '⚽' },
-  { id: 'nature', label: 'Табиат', emoji: '🌿' },
-  { id: 'food', label: 'Ошпази', emoji: '🍳' },
+  { id: 'music', label: 'Мусиқӣ', emoji: '🎵' },
   { id: 'travel', label: 'Сафар', emoji: '✈️' },
+  { id: 'food', label: 'Таом', emoji: '🍳' },
+  { id: 'sport', label: 'Варзиш', emoji: '⚽' },
+  { id: 'tech', label: 'Технология', emoji: '💻' },
+  { id: 'comedy', label: 'Комедия', emoji: '😂' },
   { id: 'fashion', label: 'Мода', emoji: '👗' },
-  { id: 'technology', label: 'Технология', emoji: '💻' },
-  { id: 'animation', label: 'Анимация', emoji: '🎬' },
-  { id: 'entertainment', label: 'Хушмазаги', emoji: '🎭' },
+  { id: 'nature', label: 'Табиат', emoji: '🌿' },
   { id: 'education', label: 'Таълим', emoji: '📚' },
-  { id: 'business', label: 'Тиджорат', emoji: '💼' },
-  { id: 'science', label: 'Илм', emoji: '🔬' },
+  { id: 'dance', label: 'Рақс', emoji: '💃' },
+  { id: 'cooking', label: 'Пухтупаз', emoji: '👨‍🍳' },
+  { id: 'fitness', label: 'Фитнес', emoji: '💪' },
 ] as const;
 
 export const FORMATS = [

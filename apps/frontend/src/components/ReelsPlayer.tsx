@@ -1,4 +1,4 @@
-import { useRef, useEffect, useCallback, useState } from 'react';
+import { useRef, useEffect, useCallback, useState, type ReactNode } from 'react';
 import type { Video } from '@/types';
 import { getPlayableUrl } from '@/utils/video';
 import {
@@ -11,6 +11,13 @@ import {
 } from '@/api/client';
 import { useFeedStore } from '@/store';
 import { CommentsSheet } from './CommentsSheet';
+import {
+  IconHeart,
+  IconComment,
+  IconShare,
+  IconBookmark,
+  IconMusic,
+} from '@/components/icons/InstagramIcons';
 
 interface ReelsPlayerProps {
   videos: Video[];
@@ -226,7 +233,7 @@ export function ReelsPlayer({
       <div
         ref={containerRef}
         onScroll={handleScroll}
-        className="h-full snap-y snap-mandatory overflow-y-scroll"
+        className="h-full snap-y snap-mandatory overflow-y-scroll scroll-smooth"
         style={{ scrollSnapType: 'y mandatory' }}
       >
         {videos.map((video, index) => (
@@ -271,45 +278,54 @@ export function ReelsPlayer({
 
             <div className="pointer-events-none absolute inset-0 bg-gradient-to-b from-black/20 via-transparent to-black/60" />
 
-            <div className="absolute bottom-24 left-4 right-16">
+            <div className="absolute bottom-20 left-4 right-16">
               <div className="mb-2 flex items-center gap-2">
                 <img
                   src={video.authorAvatar || 'https://i.pravatar.cc/40'}
                   alt=""
-                  className="h-9 w-9 rounded-full border border-white/30 object-cover"
+                  className="h-8 w-8 rounded-full border border-white/30 object-cover"
                 />
-                <span className="text-sm font-semibold">{video.authorName}</span>
+                <span className="text-sm font-semibold">@{video.authorName.replace(/\s+/g, '').toLowerCase() || 'creator'}</span>
               </div>
               <p className="line-clamp-2 text-sm">{video.caption}</p>
+              {video.hashtags?.length > 0 && (
+                <p className="mt-1 line-clamp-1 text-xs text-white/80">
+                  {video.hashtags.map((h) => `#${h}`).join(' ')}
+                </p>
+              )}
               {video.musicTitle && (
-                <p className="mt-1 flex items-center gap-1 text-xs text-white/70">
-                  <span>🎵</span> {video.musicTitle}
+                <p className="mt-2 flex items-center gap-1.5 text-xs">
+                  <IconMusic className="h-3 w-3 animate-pulse" />
+                  <span className="truncate">{video.musicTitle}</span>
                 </p>
               )}
             </div>
 
-            <div className="absolute bottom-24 right-3 flex flex-col items-center gap-5">
+            <div className="absolute bottom-24 right-2 flex flex-col items-center gap-5">
               <ActionButton
-                icon={video.isLiked ? '❤️' : '🤍'}
+                icon={<IconHeart className="h-7 w-7" filled={video.isLiked} />}
+                active={video.isLiked}
                 count={formatCount(video.likes)}
                 onClick={() => void handleLike(video)}
               />
               <ActionButton
-                icon="💬"
+                icon={<IconComment className="h-7 w-7" />}
                 count={formatCount(video.commentsCount)}
                 onClick={() => setCommentsOpen(true)}
               />
               <ActionButton
-                icon="↗️"
+                icon={<IconShare className="h-7 w-7" />}
                 count={formatCount(video.sharesCount)}
                 onClick={() => void handleShare(video)}
               />
               <ActionButton
-                icon={video.isSaved ? '🔖' : '📑'}
+                icon={<IconBookmark className="h-7 w-7" filled={video.isSaved} />}
+                active={video.isSaved}
                 count={formatCount(video.savesCount)}
                 onClick={() => void handleSave(video)}
               />
               <button
+                type="button"
                 onClick={(e) => {
                   e.stopPropagation();
                   const nextMuted = !isMuted;
@@ -320,8 +336,7 @@ export function ReelsPlayer({
                     void el.play().catch(() => undefined);
                   }
                 }}
-                className="text-2xl"
-                title={isMuted ? 'Садо кушодан' : 'Бе садо'}
+                className="text-xl opacity-90"
               >
                 {isMuted ? '🔇' : '🔊'}
               </button>
@@ -352,21 +367,24 @@ function ActionButton({
   icon,
   count,
   onClick,
+  active,
 }: {
-  icon: string;
+  icon: ReactNode;
   count: string;
   onClick: () => void;
+  active?: boolean;
 }) {
   return (
     <button
+      type="button"
       onClick={(e) => {
         e.stopPropagation();
         onClick();
       }}
-      className="flex flex-col items-center gap-0.5"
+      className={`flex flex-col items-center gap-0.5 ${active ? 'text-red-500' : 'text-white'}`}
     >
-      <span className="text-2xl drop-shadow-lg">{icon}</span>
-      <span className="text-xs font-medium drop-shadow">{count}</span>
+      <span className="drop-shadow-lg">{icon}</span>
+      <span className="text-[11px] font-semibold drop-shadow">{count}</span>
     </button>
   );
 }

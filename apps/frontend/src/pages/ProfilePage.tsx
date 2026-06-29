@@ -13,15 +13,23 @@ import { CATEGORIES, FORMATS } from '@/types';
 import { BottomNav } from '@/components/BottomNav';
 import { LoadingScreen } from '@/components/LoadingScreen';
 import { VideoGridTile } from '@/components/VideoGridTile';
+import { GridSkeleton } from '@/components/Skeleton';
 import { toVideo } from '@/utils/video';
 import type { Video } from '@/types';
 
-type Tab = 'saved' | 'liked' | 'settings';
+type Tab = 'grid' | 'saved' | 'settings';
+
+const HIGHLIGHTS = [
+  { id: 'music', label: '🎵 Music', color: 'from-pink-500 to-orange-400' },
+  { id: 'travel', label: '✈️ Travel', color: 'from-blue-500 to-cyan-400' },
+  { id: 'food', label: '🍳 Food', color: 'from-yellow-500 to-red-400' },
+  { id: 'sport', label: '⚽ Sport', color: 'from-green-500 to-emerald-400' },
+];
 
 export function ProfilePage() {
   const user = useAuthStore((s) => s.user);
   const setUser = useAuthStore((s) => s.setUser);
-  const [tab, setTab] = useState<Tab>('saved');
+  const [tab, setTab] = useState<Tab>('grid');
   const [editing, setEditing] = useState(false);
   const [bio, setBio] = useState(user?.bio ?? '');
   const [displayName, setDisplayName] = useState(user?.displayName ?? '');
@@ -54,13 +62,13 @@ export function ProfilePage() {
   const { data: savedVideos = [] } = useQuery({
     queryKey: ['saved'],
     queryFn: getSavedVideos,
-    enabled: tab === 'saved',
+    enabled: tab === 'saved' || tab === 'grid',
   });
 
   const { data: likedVideos = [] } = useQuery({
     queryKey: ['liked'],
     queryFn: getLikedVideos,
-    enabled: tab === 'liked',
+    enabled: tab === 'grid',
   });
 
   const saveMutation = useMutation({
@@ -83,40 +91,63 @@ export function ProfilePage() {
     toVideo(v),
   );
 
+  const profileGrid = tab === 'grid' ? [...savedVideos, ...likedVideos].map((v) => toVideo(v)) : gridVideos;
+  const displayGrid = tab === 'grid' ? profileGrid : gridVideos;
+
   const openVideo = (index: number) => {
-    if (gridVideos.length > 0) openPlayback(gridVideos, index);
+    if (displayGrid.length > 0) openPlayback(displayGrid, index);
   };
 
   return (
-    <div className="flex h-full flex-col overflow-y-auto pb-20">
+    <div className="flex h-full flex-col overflow-y-auto bg-black pb-14">
       <div className="px-4 pt-6">
-        <div className="flex items-start gap-4">
+        <div className="flex items-start gap-6">
           <img
             src={user.avatarUrl || 'https://i.pravatar.cc/120'}
             alt=""
-            className="h-20 w-20 rounded-full object-cover"
+            className="h-20 w-20 rounded-full object-cover ring-2 ring-white/10"
           />
-          <div className="flex-1">
-            <h1 className="text-lg font-bold">{user.displayName || user.username}</h1>
-            <p className="text-sm text-white/60">@{user.username}</p>
-            {user.bio && <p className="mt-2 text-sm">{user.bio}</p>}
-            <div className="mt-3 flex gap-4 text-sm">
-              <span>
-                <strong>{user.followersCount}</strong> подписчик
-              </span>
-              <span>
-                <strong>{user.followingCount}</strong> подписка
-              </span>
-            </div>
+          <div className="flex flex-1 justify-around pt-2 text-center">
+            <Stat count={displayGrid.length} label="видё" />
+            <Stat count={user.followersCount} label="followers" />
+            <Stat count={user.followingCount} label="following" />
           </div>
         </div>
 
+        <div className="mt-3">
+          <h1 className="text-sm font-semibold">{user.displayName || user.username}</h1>
+          <p className="text-sm text-ig-muted">@{user.username}</p>
+          {user.bio && <p className="mt-1 text-sm">{user.bio}</p>}
+        </div>
+
         <button
+          type="button"
           onClick={() => setEditing(!editing)}
-          className="mt-4 w-full rounded-xl border border-white/20 py-2 text-sm font-medium"
+          className="mt-3 w-full rounded-lg bg-ig-surface py-1.5 text-sm font-semibold"
         >
           {editing ? 'Бекор кардан' : 'Таҳрир кардан'}
         </button>
+
+        <div className="mt-4 flex gap-4 overflow-x-auto scrollbar-hide pb-1">
+          {HIGHLIGHTS.map((h) => (
+            <button key={h.id} type="button" className="flex shrink-0 flex-col items-center gap-1">
+              <div className={`rounded-full bg-gradient-to-tr ${h.color} p-[2px]`}>
+                <div className="rounded-full bg-black p-[2px]">
+                  <div className="flex h-14 w-14 items-center justify-center rounded-full bg-ig-surface text-xs">
+                    {h.label.split(' ')[0]}
+                  </div>
+                </div>
+              </div>
+              <span className="max-w-[64px] truncate text-[11px]">{h.label.split(' ')[1]}</span>
+            </button>
+          ))}
+          <button type="button" className="flex shrink-0 flex-col items-center gap-1">
+            <div className="flex h-[60px] w-[60px] items-center justify-center rounded-full border border-ig-border text-2xl">
+              +
+            </div>
+            <span className="text-[11px] text-ig-muted">Нав</span>
+          </button>
+        </div>
 
         {editing && (
           <div className="mt-4 space-y-3 rounded-xl bg-white/5 p-4">
@@ -151,16 +182,17 @@ export function ProfilePage() {
           </div>
         )}
 
-        <div className="mt-4 flex border-b border-white/10">
-          {(['saved', 'liked', 'settings'] as Tab[]).map((t) => (
+        <div className="mt-4 flex border-t border-ig-border">
+          {(['grid', 'saved', 'settings'] as Tab[]).map((t) => (
             <button
               key={t}
+              type="button"
               onClick={() => setTab(t)}
-              className={`flex-1 py-3 text-sm font-medium ${
-                tab === t ? 'border-b-2 border-white text-white' : 'text-white/50'
+              className={`flex flex-1 items-center justify-center py-3 text-xl ${
+                tab === t ? 'border-t border-white text-white' : 'text-ig-muted'
               }`}
             >
-              {t === 'saved' ? 'Сохраненные' : t === 'liked' ? 'Лайки' : 'Тanzimот'}
+              {t === 'grid' ? '▦' : t === 'saved' ? '🔖' : '⚙'}
             </button>
           ))}
         </div>
@@ -168,22 +200,29 @@ export function ProfilePage() {
 
       {tab === 'settings' ? (
         <SettingsPanel user={user} onUpdate={setUser} queryClient={queryClient} />
+      ) : isLoading ? (
+        <GridSkeleton />
       ) : (
         <div className="grid grid-cols-3 gap-0.5 p-0.5">
-          {gridVideos.length === 0 && (
-            <p className="col-span-3 py-12 text-center text-sm text-white/50">Холӣ</p>
+          {displayGrid.length === 0 && (
+            <p className="col-span-3 py-12 text-center text-sm text-ig-muted">Холӣ</p>
           )}
-          {gridVideos.map((video, index) => (
-            <VideoGridTile
-              key={video.id}
-              video={video}
-              onClick={() => openVideo(index)}
-            />
+          {displayGrid.map((video, index) => (
+            <VideoGridTile key={video.id} video={video} onClick={() => openVideo(index)} />
           ))}
         </div>
       )}
 
       <BottomNav />
+    </div>
+  );
+}
+
+function Stat({ count, label }: { count: number; label: string }) {
+  return (
+    <div>
+      <p className="text-base font-semibold">{count}</p>
+      <p className="text-xs text-ig-muted">{label}</p>
     </div>
   );
 }
