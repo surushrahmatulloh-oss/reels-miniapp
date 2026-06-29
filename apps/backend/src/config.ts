@@ -1,6 +1,10 @@
 import dotenv from 'dotenv';
+import path from 'path';
+import { fileURLToPath } from 'url';
 
-dotenv.config({ path: '../../.env' });
+const rootDir = path.join(path.dirname(fileURLToPath(import.meta.url)), '../../..');
+dotenv.config({ path: path.join(rootDir, '.env') });
+dotenv.config({ path: path.join(rootDir, '.env.deploy') });
 dotenv.config();
 
 function requireEnv(key: string, fallback?: string): string {
