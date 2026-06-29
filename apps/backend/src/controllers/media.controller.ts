@@ -39,6 +39,11 @@ export async function streamMedia(req: Request, res: Response): Promise<void> {
 
   const sourceUrl = storedUrl ?? '';
   if (!isServerPlayableUrl(sourceUrl)) {
+    console.warn('[media] isServerPlayableUrl=false', {
+      videoId,
+      sourceUrl,
+      mp4Regex: /\.mp4(\?|$)/i.test(sourceUrl),
+    });
     res.status(404).json({ error: 'Invalid media url' });
     return;
   }
