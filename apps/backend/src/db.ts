@@ -47,8 +47,12 @@ function setupConnectionEvents(): void {
   });
 }
 
+function isMongoConnected(): boolean {
+  return mongoose.connection.readyState === mongoose.ConnectionStates.connected;
+}
+
 export function isDatabaseReady(): boolean {
-  return mongoose.connection.readyState === 1 && !isFallbackMode();
+  return isMongoConnected() && !isFallbackMode();
 }
 
 export async function connectDatabase(): Promise<void> {
@@ -58,13 +62,13 @@ export async function connectDatabase(): Promise<void> {
     return;
   }
 
-  if (mongoose.connection.readyState === 1) return;
+  if (isMongoConnected()) return;
   if (connectPromise) return connectPromise;
 
   connectPromise = (async () => {
     for (let attempt = 1; attempt <= MAX_ATTEMPTS; attempt++) {
       try {
-        if (mongoose.connection.readyState !== 0) {
+        if (mongoose.connection.readyState !== mongoose.ConnectionStates.disconnected) {
           await mongoose.disconnect().catch(() => undefined);
         }
 
@@ -89,7 +93,7 @@ export async function connectDatabase(): Promise<void> {
   try {
     await connectPromise;
   } finally {
-    if (mongoose.connection.readyState !== 1 && !isFallbackMode()) {
+    if (!isMongoConnected() && !isFallbackMode()) {
       connectPromise = null;
     }
   }
