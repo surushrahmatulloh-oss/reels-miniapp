@@ -74,7 +74,7 @@ export async function buildFeed(params: {
   limit?: number;
   excludeIds?: string[];
 }): Promise<{ videos: IVideo[]; nextCursor: string | null; hasMore: boolean }> {
-  const limit = Math.min(params.limit ?? 10, 20);
+  const limit = Math.min(params.limit ?? 20, 60);
   const format = params.format ?? 'reels';
   const excludeKey = (params.excludeIds ?? []).slice(0, 50).join(',');
   const cacheKey = `feed:v4:${params.userId}:${format}:${params.cursor ?? 'start'}:${limit}:${excludeKey}`;
@@ -108,17 +108,18 @@ export async function buildFeed(params: {
     baseMatch._id = { ...prev, $nin: seenObjectIds };
   }
 
+  const fetchSize = Math.max(limit * 3, 120);
   let page = await fetchUniqueFeedPage(
     { ...baseMatch, category: { $in: preferredCategories } },
-    limit,
+    fetchSize,
   );
 
   if (page.length <= limit) {
     const extra = await fetchUniqueFeedPage(
       { ...baseMatch, category: { $nin: preferredCategories } },
-      limit,
+      fetchSize,
     );
-    page = dedupeByUrl([...page, ...extra], limit + 1);
+    page = dedupeByUrl([...page, ...extra], limit + 25);
   }
 
   if (page.length === 0) {
@@ -126,10 +127,10 @@ export async function buildFeed(params: {
     if (params.cursor && mongoose.Types.ObjectId.isValid(params.cursor)) {
       replayMatch._id = { $lt: new mongoose.Types.ObjectId(params.cursor) };
     }
-    page = await fetchUniqueFeedPage(replayMatch, limit);
+    page = await fetchUniqueFeedPage(replayMatch, fetchSize);
   }
 
-  const hasMore = page.length > limit;
+  const hasMore = page.length >= limit;
   page = page.slice(0, limit);
 
   const nextCursor =
@@ -161,7 +162,7 @@ export async function enrichVideos(
 
   return videos.map((video) => {
     const id = video._id.toString();
-    const playbackUrl = normalizePlaybackUrl(video.url, id);
+    const playbackUrl = normalizePlaybackUrl(video.url);
     return {
       id,
       instagramId: video.instagramId,

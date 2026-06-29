@@ -7,7 +7,7 @@ import { ReelsPlayer } from '@/components/ReelsPlayer';
 import { BottomNav } from '@/components/BottomNav';
 import { FeedSkeleton } from '@/components/Skeleton';
 
-const APP_VERSION = '4.7.1';
+const APP_VERSION = '4.8.0';
 
 export function ReelsPage() {
   useSocket();
@@ -35,7 +35,7 @@ export function ReelsPage() {
   const { isLoading, isError, refetch } = useQuery({
     queryKey: ['feed'],
     queryFn: async () => {
-      const data = await getFeed({ limit: 15, format: 'reels' });
+      const data = await getFeed({ limit: 30, format: 'reels' });
       setVideos(data.videos);
       setPagination(data.nextCursor, data.hasMore);
       setLoadError(null);
@@ -51,7 +51,7 @@ export function ReelsPage() {
     try {
       const loadedIds = useFeedStore.getState().videos.map((v) => v.id);
       const data = await getFeed({
-        limit: 15,
+        limit: 30,
         cursor: nextCursor,
         format: 'reels',
         excludeIds: loadedIds,

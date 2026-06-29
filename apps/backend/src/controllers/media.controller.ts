@@ -3,7 +3,7 @@ import { Readable } from 'stream';
 import { Video } from '../models/Video.js';
 import { isFallbackMode, videos as memoryVideos } from '../store/fallback.js';
 import { getParam } from '../utils/params.js';
-import { normalizePlaybackUrl } from '../data/workingMp4Pool.js';
+import { isServerPlayableUrl } from '../data/workingMp4Pool.js';
 
 export function mediaUrl(videoId: string): string {
   return `/api/media/${videoId}.mp4`;
@@ -12,7 +12,7 @@ export function mediaUrl(videoId: string): string {
 function resolveSourceUrl(videoId: string): string | null {
   if (isFallbackMode()) {
     const url = memoryVideos.find((v) => v.id === videoId)?.url ?? null;
-    return url ? normalizePlaybackUrl(url, videoId) : null;
+    return url ?? null;
   }
   return null;
 }
@@ -37,11 +37,11 @@ export async function streamMedia(req: Request, res: Response): Promise<void> {
     return;
   }
 
-  if (/youtube\.com\/embed|youtu\.be/i.test(storedUrl ?? '')) {
-    storedUrl = normalizePlaybackUrl(null, videoId);
+  const sourceUrl = storedUrl ?? '';
+  if (!isServerPlayableUrl(sourceUrl)) {
+    res.status(404).json({ error: 'Invalid media url' });
+    return;
   }
-
-  const sourceUrl = normalizePlaybackUrl(storedUrl, videoId);
 
   try {
     const headers: Record<string, string> = {
