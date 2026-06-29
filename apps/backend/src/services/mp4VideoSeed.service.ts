@@ -36,6 +36,8 @@ async function fixDuplicateUrls(): Promise<number> {
   return fixed;
 }
 
+export { fixDuplicateUrls };
+
 export async function connectMongoForSeed(): Promise<void> {
   if (mongoose.connection.readyState === 1) return;
   if (isFallbackMode() && config.useMemoryDb) {

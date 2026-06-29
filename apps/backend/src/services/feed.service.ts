@@ -55,6 +55,26 @@ function dedupeByUrl(videos: IVideo[], limit: number): IVideo[] {
   return out;
 }
 
+async function fetchUniqueFeedPage(
+  match: Record<string, unknown>,
+  limit: number,
+): Promise<IVideo[]> {
+  const rows = await Video.aggregate([
+    { $match: match },
+    { $sort: { _id: -1 } },
+    {
+      $group: {
+        _id: '$url',
+        doc: { $first: '$$ROOT' },
+      },
+    },
+    { $replaceRoot: { newRoot: '$doc' } },
+    { $sort: { _id: -1 } },
+    { $limit: limit + 1 },
+  ]);
+  return rows as unknown as IVideo[];
+}
+
 export async function buildFeed(params: {
   userId: string;
   categories: string[];
@@ -66,7 +86,7 @@ export async function buildFeed(params: {
   const limit = Math.min(params.limit ?? 10, 20);
   const format = params.format ?? 'reels';
   const excludeKey = (params.excludeIds ?? []).slice(0, 50).join(',');
-  const cacheKey = `feed:v3:${params.userId}:${format}:${params.cursor ?? 'start'}:${limit}:${excludeKey}`;
+  const cacheKey = `feed:v4:${params.userId}:${format}:${params.cursor ?? 'start'}:${limit}:${excludeKey}`;
   const cached = await cacheGet<{ videos: IVideo[]; nextCursor: string | null; hasMore: boolean }>(
     cacheKey,
   );
@@ -84,73 +104,45 @@ export async function buildFeed(params: {
     .filter((id) => mongoose.Types.ObjectId.isValid(id))
     .map((id) => new mongoose.Types.ObjectId(id));
 
-  const idFilter: Record<string, unknown> = {};
-  if (params.cursor && mongoose.Types.ObjectId.isValid(params.cursor)) {
-    idFilter.$lt = new mongoose.Types.ObjectId(params.cursor);
-  }
-  if (seenObjectIds.length > 0) {
-    idFilter.$nin = seenObjectIds;
-  }
-
-  const baseFilter: Record<string, unknown> = {
+  const baseMatch: Record<string, unknown> = {
     format,
     url: MP4_URL_FILTER,
-    ...(Object.keys(idFilter).length > 0 ? { _id: idFilter } : {}),
   };
 
-  const fetchLimit = limit * 30;
-
-  let candidates = await Video.find({
-    ...baseFilter,
-    category: { $in: preferredCategories },
-  })
-    .sort({ _id: -1 })
-    .limit(fetchLimit)
-    .lean();
-
-  if (candidates.length < limit) {
-    const extra = await Video.find({
-      ...baseFilter,
-      category: { $nin: preferredCategories },
-    })
-      .sort({ _id: -1 })
-      .limit(fetchLimit)
-      .lean();
-
-    const ids = new Set(candidates.map((v) => v._id.toString()));
-    for (const v of extra) {
-      if (!ids.has(v._id.toString())) candidates.push(v);
-    }
+  if (params.cursor && mongoose.Types.ObjectId.isValid(params.cursor)) {
+    baseMatch._id = { $lt: new mongoose.Types.ObjectId(params.cursor) };
+  }
+  if (seenObjectIds.length > 0) {
+    const prev = baseMatch._id as Record<string, unknown> | undefined;
+    baseMatch._id = { ...prev, $nin: seenObjectIds };
   }
 
-  if (candidates.length < limit) {
-    const replayFilter: Record<string, unknown> = { format, url: MP4_URL_FILTER };
+  let page = await fetchUniqueFeedPage(
+    { ...baseMatch, category: { $in: preferredCategories } },
+    limit,
+  );
+
+  if (page.length <= limit) {
+    const extra = await fetchUniqueFeedPage(
+      { ...baseMatch, category: { $nin: preferredCategories } },
+      limit,
+    );
+    page = dedupeByUrl([...page, ...extra], limit + 1);
+  }
+
+  if (page.length === 0) {
+    const replayMatch: Record<string, unknown> = { format, url: MP4_URL_FILTER };
     if (params.cursor && mongoose.Types.ObjectId.isValid(params.cursor)) {
-      replayFilter._id = { $lt: new mongoose.Types.ObjectId(params.cursor) };
+      replayMatch._id = { $lt: new mongoose.Types.ObjectId(params.cursor) };
     }
-    const replay = await Video.find(replayFilter)
-      .sort({ _id: -1 })
-      .limit(fetchLimit)
-      .lean();
-
-    const ids = new Set(candidates.map((v) => v._id.toString()));
-    for (const v of replay) {
-      if (!ids.has(v._id.toString())) candidates.push(v);
-    }
+    page = await fetchUniqueFeedPage(replayMatch, limit);
   }
 
-  const page = dedupeByUrl(candidates as unknown as IVideo[], limit);
-  const hasMore =
-    candidates.length > page.length ||
-    (page.length > 0 &&
-      (await Video.countDocuments({
-        format,
-        url: MP4_URL_FILTER,
-        _id: { $lt: page[page.length - 1]!._id },
-      })) > 0);
+  const hasMore = page.length > limit;
+  page = page.slice(0, limit);
 
   const nextCursor =
-    page.length > 0 ? page[page.length - 1]!._id.toString() : null;
+    hasMore && page.length > 0 ? page[page.length - 1]!._id.toString() : null;
 
   const result = {
     videos: page,

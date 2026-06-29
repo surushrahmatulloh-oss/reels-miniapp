@@ -45,7 +45,7 @@ async function main() {
 
     res.json({
       status: 'ok',
-      version: '4.3.1',
+      version: '4.3.2',
       db,
       videos: videoCount,
       admin: true,
@@ -119,7 +119,18 @@ async function main() {
     });
   });
 
-  void connectDatabase().then(() => console.log('Database ready'));
+  void connectDatabase().then(async () => {
+    console.log('Database ready');
+    if (!isFallbackMode()) {
+      try {
+        const { fixDuplicateUrls } = await import('./services/mp4VideoSeed.service.js');
+        const n = await fixDuplicateUrls();
+        if (n > 0) console.log(`Fixed ${n} duplicate video URLs`);
+      } catch (err) {
+        console.warn('URL dedupe skipped:', (err as Error).message);
+      }
+    }
+  });
   try {
     await connectRedis();
   } catch {
