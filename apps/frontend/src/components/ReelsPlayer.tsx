@@ -34,16 +34,48 @@ function formatCount(n: number): string {
   return String(n);
 }
 
-function startPlayback(el: HTMLVideoElement, unmuteAfter = false): void {
+const LOG = '[ReelsPlayer]';
+
+async function tryPlayVideo(
+  el: HTMLVideoElement,
+  label: string,
+  unmuteAfter = false,
+): Promise<boolean> {
   el.muted = true;
   el.playsInline = true;
-  void el.play()
-    .then(() => {
-      if (unmuteAfter) el.muted = false;
-    })
-    .catch(() => {
-      window.setTimeout(() => void el.play().catch(() => undefined), 200);
+  el.setAttribute('playsinline', '');
+  el.setAttribute('webkit-playsinline', '');
+
+  try {
+    await el.play();
+    if (unmuteAfter) el.muted = false;
+    console.log(LOG, `play OK (${label})`, { src: el.currentSrc, paused: el.paused });
+    return true;
+  } catch (err) {
+    console.warn(LOG, `play FAIL (${label})`, {
+      src: el.currentSrc,
+      readyState: el.readyState,
+      networkState: el.networkState,
+      error: err instanceof Error ? err.message : String(err),
     });
+    return false;
+  }
+}
+
+/** Manual play() fallback with retries after element loads */
+async function playWithFallback(
+  el: HTMLVideoElement,
+  label: string,
+  unmuteAfter = false,
+): Promise<void> {
+  if (await tryPlayVideo(el, label, unmuteAfter)) return;
+
+  for (const delay of [150, 400, 900]) {
+    await new Promise((r) => window.setTimeout(r, delay));
+    if (await tryPlayVideo(el, `${label}-retry@${delay}ms`, unmuteAfter)) return;
+  }
+
+  console.error(LOG, `all play attempts failed (${label})`, el.currentSrc);
 }
 
 export function ReelsPlayer({
@@ -80,16 +112,19 @@ export function ReelsPlayer({
 
   const currentVideo = videos[currentIndex];
 
-  const playVideo = useCallback((index: number) => {
-    for (const [i, video] of videoRefs.current) {
-      if (i === index) {
-        startPlayback(video, !isMuted);
-      } else {
-        video.pause();
-        video.currentTime = 0;
+  const playVideo = useCallback(
+    (index: number) => {
+      for (const [i, video] of videoRefs.current) {
+        if (i === index) {
+          void playWithFallback(video, `playVideo idx=${index}`, !isMuted);
+        } else {
+          video.pause();
+          video.currentTime = 0;
+        }
       }
-    }
-  }, [isMuted]);
+    },
+    [isMuted],
+  );
 
   useEffect(() => {
     playVideo(currentIndex);
@@ -107,13 +142,38 @@ export function ReelsPlayer({
     return () => window.clearTimeout(timer);
   }, [currentIndex, videos, playVideo, onLoadMore]);
 
+  /** Fallback: manual play() after video element mounts / src changes */
   useEffect(() => {
     const el = videoRefs.current.get(currentIndex);
-    if (el) {
-      el.muted = isMuted;
-      if (!el.paused) void el.play().catch(() => undefined);
-    }
-  }, [isMuted, currentIndex]);
+    const item = videos[currentIndex];
+    if (!el || !item) return;
+
+    console.log(LOG, 'useEffect mount', {
+      index: currentIndex,
+      id: item.id,
+      src: getPlayableUrl(item),
+      readyState: el.readyState,
+    });
+
+    void playWithFallback(el, `useEffect idx=${currentIndex}`, !isMuted);
+
+    const onLoaded = () => {
+      console.log(LOG, 'loadeddata', { index: currentIndex, src: el.currentSrc });
+      void playWithFallback(el, `loadeddata idx=${currentIndex}`, !isMuted);
+    };
+    const onCanPlay = () => {
+      console.log(LOG, 'canplay', { index: currentIndex });
+      void playWithFallback(el, `canplay idx=${currentIndex}`, !isMuted);
+    };
+
+    el.addEventListener('loadeddata', onLoaded);
+    el.addEventListener('canplay', onCanPlay);
+
+    return () => {
+      el.removeEventListener('loadeddata', onLoaded);
+      el.removeEventListener('canplay', onCanPlay);
+    };
+  }, [currentIndex, videos, isMuted]);
 
   const handleScroll = () => {
     const container = containerRef.current;
@@ -148,10 +208,15 @@ export function ReelsPlayer({
   const handleTap = (index: number) => {
     if (Date.now() - lastTapRef.current < 300) return;
     const el = videoRefs.current.get(index);
-    if (!el) return;
+    if (!el) {
+      console.warn(LOG, 'handleTap: no video element', index);
+      return;
+    }
     if (el.paused) {
-      startPlayback(el, !isMuted);
+      console.log(LOG, 'handleTap: play', { index, src: el.currentSrc });
+      void playWithFallback(el, `tap idx=${index}`, !isMuted);
     } else {
+      console.log(LOG, 'handleTap: pause', { index });
       el.pause();
     }
   };
@@ -226,10 +291,30 @@ export function ReelsPlayer({
               autoPlay
               preload="auto"
               onLoadedData={() => {
-                if (index === currentIndex) startPlayback(videoRefs.current.get(index)!);
+                const el = videoRefs.current.get(index);
+                if (el && index === currentIndex) {
+                  console.log(LOG, 'onLoadedData prop', index);
+                  void playWithFallback(el, `onLoadedData idx=${index}`, !isMuted);
+                }
               }}
               onCanPlay={() => {
-                if (index === currentIndex) startPlayback(videoRefs.current.get(index)!);
+                const el = videoRefs.current.get(index);
+                if (el && index === currentIndex) {
+                  void playWithFallback(el, `onCanPlay prop idx=${index}`, !isMuted);
+                }
+              }}
+              onError={(e) => {
+                const el = e.currentTarget;
+                console.error(LOG, 'video error', {
+                  index,
+                  src: el.currentSrc,
+                  networkState: el.networkState,
+                  mediaError: el.error?.code,
+                  message: el.error?.message,
+                });
+              }}
+              onPlaying={() => {
+                console.log(LOG, 'playing', { index, src: videoRefs.current.get(index)?.currentSrc });
               }}
             />
 
@@ -310,7 +395,7 @@ export function ReelsPlayer({
                   const el = videoRefs.current.get(currentIndex);
                   if (el) {
                     el.muted = nextMuted;
-                    void el.play().catch(() => undefined);
+                    void tryPlayVideo(el, 'mute-toggle', !nextMuted);
                   }
                 }}
                 className="text-xl opacity-90"
