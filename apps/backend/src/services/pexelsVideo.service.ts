@@ -226,7 +226,10 @@ export async function fetchVideosForCategory(
     }
   };
 
-  for (let page = 1; page <= 5 && collected.length < targetCount; page++) {
+  const hasApi = Boolean(config.pexelsApiKey || config.pixabayApiKey);
+  const maxPages = hasApi ? 3 : 0;
+
+  for (let page = 1; page <= maxPages && collected.length < targetCount; page++) {
     add(await fetchPexels(query, 40, page));
     if (collected.length >= targetCount) break;
     add(await fetchPixabay(query, 40, page));

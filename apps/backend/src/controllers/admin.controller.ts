@@ -12,7 +12,7 @@ export async function fetchVideosHandler(_req: Request, res: Response): Promise<
   }
 
   try {
-    const result = await seedMp4Videos({ clearYoutube: false, perCategory: 80 });
+    const result = await seedMp4Videos({ clearYoutube: false, perCategory: 25 });
     res.json({
       ok: true,
       added: result.added,

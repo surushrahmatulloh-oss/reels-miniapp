@@ -46,15 +46,20 @@ export async function seedMp4Videos(options?: {
   let skipped = 0;
   const byCategory: Record<string, number> = {};
 
-  // Migrate existing YouTube rows → MP4 URLs
+  // Bulk-migrate YouTube rows using category fallback pool (fast, no per-row API calls)
   const youtubeRows = await Video.find({ url: { $regex: /youtube\.com\/embed/i } })
     .sort({ createdAt: -1 })
-    .limit(500)
+    .limit(200)
     .lean();
 
+  const poolByCategory = new Map<string, Awaited<ReturnType<typeof fetchVideosForCategory>>>();
   for (const row of youtubeRows) {
-    const pool = await fetchVideosForCategory(row.category, 1);
-    const entry = pool[0];
+    let pool = poolByCategory.get(row.category);
+    if (!pool?.length) {
+      pool = await fetchVideosForCategory(row.category, 30);
+      poolByCategory.set(row.category, pool);
+    }
+    const entry = pool[updated % pool.length];
     if (!entry) continue;
     await Video.updateOne(
       { _id: row._id },
