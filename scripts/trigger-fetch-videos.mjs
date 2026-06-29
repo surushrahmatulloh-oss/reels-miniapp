@@ -56,7 +56,14 @@ const headers = { 'x-admin-key': adminKey };
 for (let i = 0; i < 60; i++) {
   await new Promise((r) => setTimeout(r, 5000));
   const statusRes = await fetch(`${RENDER_URL}/api/admin/seed-status`, { headers });
-  const status = await statusRes.json();
+  const raw = await statusRes.text();
+  let status;
+  try {
+    status = JSON.parse(raw);
+  } catch {
+    console.log('[seed-status] invalid JSON', statusRes.status, raw.slice(0, 100));
+    continue;
+  }
   console.log(`[seed-status] running=${status.running}`);
   if (!status.running && (status.lastResult || status.lastError)) {
     console.log(JSON.stringify(status, null, 2));
