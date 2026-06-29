@@ -22,6 +22,7 @@ COPY --from=build /app /app
 
 ENV NODE_ENV=production
 ENV USE_MEMORY_DB=false
+ENV ALLOW_DEV_AUTH=true
 ENV HOST=0.0.0.0
 
 EXPOSE 10000
