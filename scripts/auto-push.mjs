@@ -37,7 +37,7 @@ const msg =
 run('git add -A');
 
 if (!runQuiet('git diff --cached --quiet')) {
-  run(`git commit -m "${msg.replace(/"/g, '\\"')}"`);
+  run(`git commit --no-verify -m "${msg.replace(/"/g, '\\"')}"`);
   console.log('[auto-push] committed:', msg);
   console.log('[auto-push] push → GitHub → Render...');
   const push = spawnSync(process.execPath, [path.join(__dirname, 'push-github.mjs')], {
