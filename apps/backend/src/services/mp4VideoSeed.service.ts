@@ -1,24 +1,13 @@
-import mongoose from 'mongoose';
-import dns from 'dns';
-import { config } from '../config.js';
-import { isFallbackMode } from '../store/fallback.js';
 import { Video } from '../models/Video.js';
 import { SEED_CATEGORIES } from '../data/youtubeSamplePool.js';
 import { fetchVideosForCategory, isPlayableMp4Url } from './pexelsVideo.service.js';
+import { connectDatabase } from '../db.js';
 
-const TARGET_TOTAL = 2310;
+const TARGET_TOTAL = 1000;
+const INSERT_BATCH = 40;
 
 function isMp4Only(url: string): boolean {
   return /\.mp4(\?|$)/i.test(url) && !/youtube\.com|youtu\.be/i.test(url);
-}
-
-export async function connectMongoForSeed(): Promise<void> {
-  if (mongoose.connection.readyState === 1) return;
-  if (isFallbackMode() && config.useMemoryDb) {
-    throw new Error('USE_MEMORY_DB=true — MongoDB ғайрифаъол.');
-  }
-  dns.setServers(['8.8.8.8', '1.1.1.1']);
-  await mongoose.connect(config.mongodbUri, { serverSelectionTimeoutMS: 15_000 });
 }
 
 export async function seedMp4Videos(options?: {
@@ -34,7 +23,7 @@ export async function seedMp4Videos(options?: {
   youtubeRemaining: number;
   byCategory: Record<string, number>;
 }> {
-  await connectMongoForSeed();
+  await connectDatabase();
 
   const targetTotal = options?.targetTotal ?? TARGET_TOTAL;
   const perCategory =
@@ -92,24 +81,27 @@ export async function seedMp4Videos(options?: {
       existingUrls.add(entry.mp4Url);
     }
 
-    if (docs.length > 0) {
+    let categoryAdded = 0;
+    for (let i = 0; i < docs.length; i += INSERT_BATCH) {
+      const batch = docs.slice(i, i + INSERT_BATCH);
       try {
-        const inserted = await Video.insertMany(docs, { ordered: false });
+        const inserted = await Video.insertMany(batch, { ordered: false });
+        categoryAdded += inserted.length;
         added += inserted.length;
-        byCategory[category] = inserted.length;
       } catch (err: unknown) {
         const bulk = err as { code?: number; insertedDocs?: unknown[]; result?: { insertedCount?: number } };
         if (bulk.code === 11000) {
           const n = bulk.insertedDocs?.length ?? bulk.result?.insertedCount ?? 0;
+          categoryAdded += n;
           added += n;
-          byCategory[category] = n;
         } else {
           throw err;
         }
       }
     }
 
-    console.log(`[mp4-seed] ${category}: +${byCategory[category]}`);
+    byCategory[category] = categoryAdded;
+    console.log(`[mp4-seed] ${category}: +${categoryAdded}`);
   }
 
   const total = await Video.countDocuments();

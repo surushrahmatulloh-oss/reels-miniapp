@@ -4,6 +4,7 @@ import type { VideoFormat } from '../types/index.js';
 import { buildFeed, enrichVideos, markVideoViewed } from '../services/feed.service.js';
 import { User } from '../models/User.js';
 import { isFallbackMode } from '../store/fallback.js';
+import { isDatabaseReady } from '../db.js';
 import * as fb from '../services/fallback.service.js';
 import type { AuthRequest } from '../middleware/auth.js';
 import { getParam } from '../utils/params.js';
@@ -18,6 +19,11 @@ export async function getFeed(req: AuthRequest, res: Response): Promise<void> {
 
   if (isFallbackMode()) {
     res.json(fb.fallbackGetFeed(req.user!.userId, limit, cursor));
+    return;
+  }
+
+  if (!isDatabaseReady()) {
+    res.status(503).json({ error: 'Database connecting', retryAfter: 3 });
     return;
   }
 

@@ -1,5 +1,5 @@
 /**
- * POST /api/admin/fetch-videos — wipe DB + seed 2310 MP4 videos
+ * POST /api/admin/fetch-videos — wipe DB + seed 1000 MP4 videos
  */
 import { existsSync, readFileSync } from 'fs';
 import path from 'path';
@@ -37,12 +37,12 @@ const headers = {
   'x-admin-key': adminKey,
 };
 
-console.log(`POST ${RENDER_URL}/api/admin/fetch-videos (wipeAll + 2310 MP4)...`);
+console.log(`POST ${RENDER_URL}/api/admin/fetch-videos (wipeAll + 1000 MP4)...`);
 
 const res = await fetch(`${RENDER_URL}/api/admin/fetch-videos`, {
   method: 'POST',
   headers,
-  body: JSON.stringify({ wipeAll: true, targetTotal: 2310, perCategory: 129 }),
+  body: JSON.stringify({ wipeAll: true, targetTotal: 1000, perCategory: 56 }),
 });
 
 const text = await res.text();

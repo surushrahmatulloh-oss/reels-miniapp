@@ -59,19 +59,10 @@ async function fetchUniqueFeedPage(
   match: Record<string, unknown>,
   limit: number,
 ): Promise<IVideo[]> {
-  const rows = await Video.aggregate([
-    { $match: match },
-    { $sort: { _id: -1 } },
-    {
-      $group: {
-        _id: '$url',
-        doc: { $first: '$$ROOT' },
-      },
-    },
-    { $replaceRoot: { newRoot: '$doc' } },
-    { $sort: { _id: -1 } },
-    { $limit: limit + 1 },
-  ]);
+  const rows = await Video.find(match)
+    .sort({ _id: -1 })
+    .limit(limit + 1)
+    .lean();
   return rows as unknown as IVideo[];
 }
 

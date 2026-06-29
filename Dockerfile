@@ -10,7 +10,7 @@ RUN pnpm install --frozen-lockfile
 
 COPY . .
 # Cache bust — forces full rebuild (same as Clear build cache on Render)
-ARG CACHEBUST=20260630-v451
+ARG CACHEBUST=20260630-v460
 RUN echo "build ${CACHEBUST}"
 ENV VITE_API_URL=
 ENV VITE_WS_URL=
@@ -27,6 +27,7 @@ ENV NODE_ENV=production
 ENV USE_MEMORY_DB=false
 ENV ALLOW_DEV_AUTH=true
 ENV HOST=0.0.0.0
+ENV NODE_OPTIONS=--max-old-space-size=460
 
 EXPOSE 10000
 CMD ["node", "apps/backend/dist/index.js"]
