@@ -43,7 +43,6 @@ if (!runQuiet('git diff --cached --quiet')) {
   const push = spawnSync(process.execPath, [path.join(__dirname, 'push-github.mjs')], {
     cwd: root,
     stdio: 'inherit',
-    shell: true,
   });
   if (push.status !== 0) {
     console.warn('[auto-push] push failed — VPN/GitHub? Боз кӯшиш: node scripts/push-github.mjs');
