@@ -1,17 +1,25 @@
 import type { Video } from '@/types';
 
-export function getPlayableUrl(video: Pick<Video, 'id' | 'url'>): string {
+export function getPlayableUrl(video: Pick<Video, 'id' | 'url'> & { playUrl?: string }): string {
+  if (video.playUrl) return video.playUrl;
   const url = video.url ?? '';
   if (url.includes('/api/media/')) return url;
+  if (/\.mp4(\?|$)/i.test(url) || /videos\.pexels\.com|pixabay|commondatastorage/i.test(url)) {
+    return `/api/media/${video.id}.mp4`;
+  }
   return `/api/media/${video.id}.mp4`;
 }
 
-export function toVideo(partial: Partial<Video> & { id: string }): Video {
-  const url = partial.url ?? `/api/media/${partial.id}.mp4`;
+export function toVideo(partial: Partial<Video> & { id: string; playUrl?: string }): Video {
+  const playUrl = partial.playUrl ?? `/api/media/${partial.id}.mp4`;
+  const url = partial.url && !/youtube\.com\/embed/i.test(partial.url)
+    ? partial.url
+    : playUrl;
   return {
     id: partial.id,
     instagramId: partial.instagramId ?? partial.id,
     url,
+    playUrl,
     thumbnailUrl: partial.thumbnailUrl ?? `https://picsum.photos/seed/reel${partial.id}/720/1280`,
     format: partial.format ?? 'reels',
     category: partial.category ?? 'entertainment',

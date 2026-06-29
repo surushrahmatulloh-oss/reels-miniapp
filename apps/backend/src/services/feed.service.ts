@@ -1,9 +1,10 @@
-import type { Types } from 'mongoose';
+import mongoose, { type Types } from 'mongoose';
 import { Video, type IVideo } from '../models/Video.js';
 import { View } from '../models/Interaction.js';
 import { Like, Save } from '../models/Interaction.js';
 import { cacheGet, cacheSet } from '../redis.js';
 import type { VideoFormat } from '../types/index.js';
+import { isPlayableMp4Url } from './pexelsVideo.service.js';
 
 const CATEGORIES = [
   'music',
@@ -18,21 +19,26 @@ const CATEGORIES = [
   'dance',
   'cooking',
   'fitness',
+  'animals',
+  'art',
+  'gaming',
+  'news',
+  'health',
+  'business',
 ];
 
 export { CATEGORIES };
 
-function shuffle<T>(arr: T[]): T[] {
-  const copy = [...arr];
-  for (let i = copy.length - 1; i > 0; i--) {
-    const j = Math.floor(Math.random() * (i + 1));
-    [copy[i], copy[j]] = [copy[j]!, copy[i]!];
-  }
-  return copy;
-}
+const MP4_URL_FILTER = {
+  $not: { $regex: /youtube\.com\/embed|youtu\.be/i },
+};
 
-async function getSeenVideoIds(userId: string): Promise<Set<string>> {
-  const views = await View.find({ userId }).select('videoId').lean();
+async function getRecentlySeenIds(userId: string, limit = 40): Promise<Set<string>> {
+  const views = await View.find({ userId })
+    .sort({ createdAt: -1 })
+    .limit(limit)
+    .select('videoId')
+    .lean();
   return new Set(views.map((v) => v.videoId.toString()));
 }
 
@@ -45,75 +51,82 @@ export async function buildFeed(params: {
 }): Promise<{ videos: IVideo[]; nextCursor: string | null; hasMore: boolean }> {
   const limit = Math.min(params.limit ?? 10, 20);
   const format = params.format ?? 'reels';
-  const cacheKey = `feed:${params.userId}:${format}:${params.cursor ?? 'start'}:${limit}`;
+  const cacheKey = `feed:v2:${params.userId}:${format}:${params.cursor ?? 'start'}:${limit}`;
   const cached = await cacheGet<{ videos: IVideo[]; nextCursor: string | null; hasMore: boolean }>(
     cacheKey,
   );
   if (cached) return cached;
 
-  const seenIds = await getSeenVideoIds(params.userId);
   const preferredCategories =
-    params.categories.length > 0 ? params.categories : CATEGORIES.slice(0, 3);
+    params.categories.length > 0 ? params.categories : CATEGORIES.slice(0, 6);
 
-  const preferredLimit = Math.ceil(limit * 0.7);
-  const trendingLimit = Math.ceil(limit * 0.2);
-  const discoveryLimit = limit - preferredLimit - trendingLimit;
+  const recentlySeen = await getRecentlySeenIds(params.userId);
+  const seenObjectIds = [...recentlySeen]
+    .filter((id) => mongoose.Types.ObjectId.isValid(id))
+    .map((id) => new mongoose.Types.ObjectId(id));
 
-  const baseFilter = {
+  const idFilter: Record<string, unknown> = {};
+  if (params.cursor && mongoose.Types.ObjectId.isValid(params.cursor)) {
+    idFilter.$lt = new mongoose.Types.ObjectId(params.cursor);
+  }
+  if (seenObjectIds.length > 0) {
+    idFilter.$nin = seenObjectIds;
+  }
+
+  const baseFilter: Record<string, unknown> = {
     format,
-    _id: { $nin: [...seenIds].map((id) => id) },
+    url: MP4_URL_FILTER,
+    ...(Object.keys(idFilter).length > 0 ? { _id: idFilter } : {}),
   };
 
-  const [preferred, trending, discovery] = await Promise.all([
-    Video.find({ ...baseFilter, category: { $in: preferredCategories } })
-      .sort({ createdAt: -1 })
-      .limit(preferredLimit * 2)
-      .lean(),
-    Video.find(baseFilter)
-      .sort({ likes: -1, views: -1 })
-      .limit(trendingLimit * 2)
-      .lean(),
-    Video.find(baseFilter)
-      .sort({ createdAt: -1 })
-      .limit(discoveryLimit * 2)
-      .lean(),
-  ]);
+  let videos = await Video.find({
+    ...baseFilter,
+    category: { $in: preferredCategories },
+  })
+    .sort({ _id: -1 })
+    .limit(limit + 1)
+    .lean();
 
-  const merged = shuffle([
-    ...preferred.slice(0, preferredLimit),
-    ...trending.slice(0, trendingLimit),
-    ...discovery.slice(0, discoveryLimit),
-  ]);
+  if (videos.length <= limit) {
+    const extraFilter = { ...baseFilter };
+    delete (extraFilter as { category?: unknown }).category;
 
-  const uniqueMap = new Map<string, (typeof merged)[0]>();
-  for (const video of merged) {
-    uniqueMap.set(video._id.toString(), video);
-  }
-  let videos = [...uniqueMap.values()].slice(0, limit);
+    const extra = await Video.find(extraFilter)
+      .sort({ _id: -1 })
+      .limit(limit + 1)
+      .lean();
 
-  if (params.cursor) {
-    const cursorIndex = videos.findIndex((v) => v._id.toString() === params.cursor);
-    if (cursorIndex >= 0) {
-      videos = videos.slice(cursorIndex + 1);
+    const ids = new Set(videos.map((v) => v._id.toString()));
+    for (const v of extra) {
+      if (!ids.has(v._id.toString())) videos.push(v);
     }
   }
 
-  videos = videos.slice(0, limit);
+  if (videos.length === 0) {
+    const replayFilter: Record<string, unknown> = { format, url: MP4_URL_FILTER };
+    if (params.cursor && mongoose.Types.ObjectId.isValid(params.cursor)) {
+      replayFilter._id = { $lt: new mongoose.Types.ObjectId(params.cursor) };
+    }
+    videos = await Video.find(replayFilter)
+      .sort({ _id: -1 })
+      .limit(limit + 1)
+      .lean();
+  }
 
+  const hasMore = videos.length > limit;
+  const page = videos.slice(0, limit);
   const nextCursor =
-    videos.length > 0 ? videos[videos.length - 1]!._id.toString() : null;
-  const totalRemaining = await Video.countDocuments({
-    format,
-    _id: { $nin: [...seenIds, ...videos.map((v) => v._id)] },
-  });
+    hasMore && page.length > 0 ? page[page.length - 1]!._id.toString() : null;
+
+  const totalMp4 = await Video.countDocuments({ format, url: MP4_URL_FILTER });
 
   const result = {
-    videos: videos as unknown as IVideo[],
+    videos: page as unknown as IVideo[],
     nextCursor,
-    hasMore: totalRemaining > 0,
+    hasMore: hasMore || (totalMp4 > page.length && page.length > 0),
   };
 
-  await cacheSet(cacheKey, result, 60);
+  await cacheSet(cacheKey, result, 30);
   return result;
 }
 
@@ -131,33 +144,39 @@ export async function enrichVideos(
   const likedSet = new Set(likes.map((l) => l.videoId.toString()));
   const savedSet = new Set(saves.map((s) => s.videoId.toString()));
 
-  return videos.map((video) => ({
-    id: video._id.toString(),
-    instagramId: video.instagramId,
-    url: video.url,
-    thumbnailUrl: video.thumbnailUrl,
-    format: video.format,
-    category: video.category,
-    hashtags: video.hashtags,
-    caption: video.caption,
-    authorName: video.authorName,
-    authorAvatar: video.authorAvatar,
-    musicTitle: video.musicTitle,
-    likes: video.likes,
-    views: video.views,
-    commentsCount: video.commentsCount,
-    sharesCount: video.sharesCount,
-    savesCount: video.savesCount,
-    createdAt: video.createdAt,
-    isLiked: likedSet.has(video._id.toString()),
-    isSaved: savedSet.has(video._id.toString()),
-  }));
+  return videos.map((video) => {
+    const id = video._id.toString();
+    const directMp4 = isPlayableMp4Url(video.url) ? video.url : '';
+    return {
+      id,
+      instagramId: video.instagramId,
+      url: directMp4,
+      playUrl: `/api/media/${id}.mp4`,
+      thumbnailUrl: video.thumbnailUrl,
+      title: video.title,
+      format: video.format,
+      category: video.category,
+      hashtags: video.hashtags,
+      caption: video.caption,
+      authorName: video.authorName,
+      authorAvatar: video.authorAvatar,
+      musicTitle: video.musicTitle,
+      likes: video.likes,
+      views: video.views,
+      commentsCount: video.commentsCount,
+      sharesCount: video.sharesCount,
+      savesCount: video.savesCount,
+      createdAt: video.createdAt,
+      isLiked: likedSet.has(id),
+      isSaved: savedSet.has(id),
+    };
+  });
 }
 
 export async function markVideoViewed(userId: string, videoId: Types.ObjectId): Promise<void> {
   await View.findOneAndUpdate(
     { userId, videoId },
-    { userId, videoId },
+    { userId, videoId, createdAt: new Date() },
     { upsert: true, new: true },
   );
   await Video.findByIdAndUpdate(videoId, { $inc: { views: 1 } });

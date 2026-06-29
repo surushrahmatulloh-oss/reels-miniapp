@@ -25,6 +25,7 @@ export interface Video {
   id: string;
   instagramId: string;
   url: string;
+  playUrl?: string;
   thumbnailUrl: string;
   format: VideoFormat;
   category: string;

@@ -3,6 +3,7 @@ import { Readable } from 'stream';
 import { Video } from '../models/Video.js';
 import { isFallbackMode, videos as memoryVideos } from '../store/fallback.js';
 import { getParam } from '../utils/params.js';
+import { isPlayableMp4Url } from '../services/pexelsVideo.service.js';
 
 export function mediaUrl(videoId: string): string {
   return `/api/media/${videoId}.mp4`;
@@ -35,18 +36,29 @@ export async function streamMedia(req: Request, res: Response): Promise<void> {
     return;
   }
 
+  if (/youtube\.com\/embed|youtu\.be/i.test(sourceUrl)) {
+    res.status(410).json({ error: 'YouTube embed not supported — use MP4' });
+    return;
+  }
+
+  // Direct MP4 — redirect for better range support & less server load
+  if (isPlayableMp4Url(sourceUrl) && !req.headers.range) {
+    res.redirect(302, sourceUrl);
+    return;
+  }
+
   try {
-    const headers: Record<string, string> = {};
+    const headers: Record<string, string> = {
+      'User-Agent': 'Mozilla/5.0 (compatible; ReelsMiniApp/1.0)',
+    };
     if (req.headers.range) headers.Range = String(req.headers.range);
 
     const upstream = await fetch(sourceUrl, {
-      headers: {
-        ...headers,
-        'User-Agent': 'Mozilla/5.0 (compatible; ReelsMiniApp/1.0)',
-      },
+      headers,
       redirect: 'follow',
-      signal: AbortSignal.timeout(25_000),
+      signal: AbortSignal.timeout(30_000),
     });
+
     if (!upstream.ok || !upstream.body) {
       res.status(502).end();
       return;

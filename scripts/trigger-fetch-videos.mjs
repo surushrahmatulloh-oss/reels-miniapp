@@ -1,5 +1,5 @@
 /**
- * POST /api/admin/fetch-videos on Render — seeds sample YouTube embed videos to MongoDB
+ * POST /api/admin/fetch-videos on Render — seeds MP4 videos (Pexels/Pixabay/fallback) to MongoDB
  */
 import { existsSync, readFileSync } from 'fs';
 import path from 'path';
