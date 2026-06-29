@@ -11,6 +11,8 @@
     "lint": "pnpm -r lint",
     "format": "prettier --write \"**/*.{ts,tsx,js,json,md}\"",
     "seed": "pnpm --filter backend seed",
+    "seed:videos": "pnpm --filter backend seed-videos",
+    "seed:render": "node scripts/trigger-fetch-videos.mjs",
     "autopush": "node scripts/watch-and-push.mjs",
     "autopush:once": "node scripts/auto-push.mjs",
     "hooks:install": "node scripts/install-git-hooks.mjs"
