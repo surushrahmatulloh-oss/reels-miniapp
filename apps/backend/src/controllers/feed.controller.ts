@@ -1,7 +1,7 @@
 import type { Response } from 'express';
 import mongoose from 'mongoose';
 import type { VideoFormat } from '../types/index.js';
-import { buildFeed, enrichVideos, markVideoViewed } from '../services/feed.service.js';
+import { buildFeed, CATEGORIES, enrichVideos, markVideoViewed } from '../services/feed.service.js';
 import { User } from '../models/User.js';
 import { isFallbackMode } from '../store/fallback.js';
 import { isDatabaseReady } from '../db.js';
@@ -28,6 +28,13 @@ export async function getFeed(req: AuthRequest, res: Response): Promise<void> {
   }
 
   const format = (req.query.format as VideoFormat | undefined) ?? 'reels';
+  const categoriesFromQuery =
+    typeof req.query.categories === 'string'
+      ? req.query.categories
+          .split(',')
+          .map((s) => s.trim().toLowerCase())
+          .filter((s) => CATEGORIES.includes(s))
+      : [];
 
   const user = await User.findById(req.user!.userId);
   if (!user) {
@@ -37,7 +44,7 @@ export async function getFeed(req: AuthRequest, res: Response): Promise<void> {
 
   const feed = await buildFeed({
     userId: req.user!.userId,
-    categories: user.preferences.categories,
+    categories: categoriesFromQuery.length > 0 ? categoriesFromQuery : user.preferences.categories,
     format,
     cursor,
     limit,

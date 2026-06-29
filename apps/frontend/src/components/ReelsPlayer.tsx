@@ -160,7 +160,6 @@ export function ReelsPlayer({
       playBlockedRef.current = false;
       for (const [i, video] of videoRefs.current) {
         if (i === index) {
-          video.load();
           video.muted = isMuted;
           void playWithFallback(video, `playVideo idx=${index}`).then((ok) => {
             if (!ok && video.paused) {
@@ -468,18 +467,12 @@ export function ReelsPlayer({
               onStalled={() => {
                 const el = videoRefs.current.get(index);
                 if (!el || index !== currentIndex) return;
-                void playWithFallback(el, `stalled idx=${index}`).then((ok) => {
-                  playBlockedRef.current = !ok && el.paused;
-                  syncPlayOverlay(index, `stalled ok=${ok}`);
-                });
+                logVideoState(el, `stalled idx=${index}`);
               }}
               onWaiting={() => {
                 const el = videoRefs.current.get(index);
                 if (!el || index !== currentIndex) return;
-                void playWithFallback(el, `waiting idx=${index}`).then((ok) => {
-                  playBlockedRef.current = !ok && el.paused;
-                  syncPlayOverlay(index, `waiting ok=${ok}`);
-                });
+                logVideoState(el, `waiting idx=${index}`);
               }}
               onPlaying={() => {
                 if (index !== currentIndex) return;
