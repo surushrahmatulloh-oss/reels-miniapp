@@ -43,7 +43,7 @@ async function main() {
 
     res.json({
       status: 'ok',
-      version: '3.0.1',
+      version: '4.0.0',
       db,
       videos: videoCount,
       admin: true,

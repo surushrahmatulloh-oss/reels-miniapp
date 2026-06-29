@@ -80,7 +80,7 @@ export function CommentsSheet({ videoId, isOpen, onClose }: CommentsSheetProps) 
   return (
     <div className="fixed inset-0 z-[60] flex flex-col justify-end">
       <div className="absolute inset-0 bg-black/70" onClick={onClose} />
-      <div className="relative flex max-h-[75vh] flex-col rounded-t-2xl bg-ig-surface">
+      <div className="relative flex max-h-[80vh] flex-col rounded-t-2xl bg-black border-t border-ig-border">
         <div className="mx-auto mt-2 h-1 w-10 rounded-full bg-white/20" />
         <div className="flex items-center justify-center border-b border-ig-border px-4 py-3">
           <h3 className="text-sm font-semibold">Комментарийҳо</h3>
@@ -135,7 +135,7 @@ export function CommentsSheet({ videoId, isOpen, onClose }: CommentsSheetProps) 
             type="button"
             onClick={handleSubmit}
             disabled={!text.trim() || mutation.isPending}
-            className="text-sm font-semibold text-ig-link disabled:opacity-40"
+            className={`text-sm font-semibold ${text.trim() ? 'text-ig-accent' : 'text-ig-muted'} disabled:opacity-40`}
           >
             Фиристодан
           </button>
@@ -192,7 +192,7 @@ function CommentRow({
           ))}
         </div>
         <button type="button" onClick={onLike} className="shrink-0 pt-1">
-          <IconHeart className={`h-3 w-3 ${comment.isLiked ? 'text-red-500' : 'text-ig-muted'}`} filled={comment.isLiked} />
+          <IconHeart className={`h-3 w-3 ${comment.isLiked ? 'text-ig-accent' : 'text-ig-muted'}`} filled={comment.isLiked} />
         </button>
       </div>
     </div>

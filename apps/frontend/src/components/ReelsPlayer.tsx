@@ -25,6 +25,7 @@ interface ReelsPlayerProps {
   startIndex?: number;
   controlledIndex?: number;
   onIndexChange?: (index: number) => void;
+  immersive?: boolean;
 }
 
 function formatCount(n: number): string {
@@ -58,6 +59,7 @@ export function ReelsPlayer({
   startIndex = 0,
   controlledIndex,
   onIndexChange,
+  immersive = false,
 }: ReelsPlayerProps) {
   const containerRef = useRef<HTMLDivElement>(null);
   const videoRefs = useRef<Map<number, HTMLVideoElement>>(new Map());
@@ -233,13 +235,13 @@ export function ReelsPlayer({
       <div
         ref={containerRef}
         onScroll={handleScroll}
-        className="h-full snap-y snap-mandatory overflow-y-scroll scroll-smooth"
+        className={`${immersive ? 'h-full' : 'h-full'} snap-y snap-mandatory overflow-y-scroll scroll-smooth`}
         style={{ scrollSnapType: 'y mandatory' }}
       >
         {videos.map((video, index) => (
           <div
             key={video.id}
-            className="relative h-full w-full snap-start snap-always bg-black"
+            className="relative h-full min-h-full w-full snap-start snap-always bg-black"
             onClick={() => handleTap(index)}
             onTouchEnd={(e) => handleDoubleTap(e, video)}
           >
@@ -278,30 +280,39 @@ export function ReelsPlayer({
 
             <div className="pointer-events-none absolute inset-0 bg-gradient-to-b from-black/20 via-transparent to-black/60" />
 
-            <div className="absolute bottom-20 left-4 right-16">
+            <div className="absolute bottom-16 left-3 right-14 z-10">
               <div className="mb-2 flex items-center gap-2">
                 <img
                   src={video.authorAvatar || 'https://i.pravatar.cc/40'}
                   alt=""
-                  className="h-8 w-8 rounded-full border border-white/30 object-cover"
+                  className="h-8 w-8 rounded-full border border-white/40 object-cover"
                 />
-                <span className="text-sm font-semibold">@{video.authorName.replace(/\s+/g, '').toLowerCase() || 'creator'}</span>
+                <span className="text-sm font-semibold drop-shadow">
+                  @{video.authorName.replace(/\s+/g, '').toLowerCase() || 'creator'}
+                </span>
+                <button
+                  type="button"
+                  onClick={(e) => e.stopPropagation()}
+                  className="ml-1 rounded-md border border-white/60 px-2 py-0.5 text-xs font-semibold"
+                >
+                  Follow
+                </button>
               </div>
-              <p className="line-clamp-2 text-sm">{video.caption}</p>
+              <p className="line-clamp-2 text-sm drop-shadow">{video.caption}</p>
               {video.hashtags?.length > 0 && (
-                <p className="mt-1 line-clamp-1 text-xs text-white/80">
+                <p className="mt-1 line-clamp-1 text-xs text-white/90 drop-shadow">
                   {video.hashtags.map((h) => `#${h}`).join(' ')}
                 </p>
               )}
               {video.musicTitle && (
-                <p className="mt-2 flex items-center gap-1.5 text-xs">
-                  <IconMusic className="h-3 w-3 animate-pulse" />
-                  <span className="truncate">{video.musicTitle}</span>
-                </p>
+                <div className="mt-2 flex items-center gap-2 overflow-hidden">
+                  <IconMusic className="h-3 w-3 shrink-0 animate-pulse" />
+                  <p className="truncate text-xs drop-shadow">{video.musicTitle}</p>
+                </div>
               )}
             </div>
 
-            <div className="absolute bottom-24 right-2 flex flex-col items-center gap-5">
+            <div className="absolute bottom-20 right-2 z-10 flex flex-col items-center gap-5">
               <ActionButton
                 icon={<IconHeart className="h-7 w-7" filled={video.isLiked} />}
                 active={video.isLiked}
@@ -326,6 +337,17 @@ export function ReelsPlayer({
               />
               <button
                 type="button"
+                onClick={(e) => e.stopPropagation()}
+                className="h-9 w-9 overflow-hidden rounded-lg border-2 border-white/80"
+              >
+                <img
+                  src={video.thumbnailUrl || video.authorAvatar || 'https://i.pravatar.cc/80'}
+                  alt=""
+                  className={`h-full w-full object-cover ${index === currentIndex ? 'animate-spin-slow' : ''}`}
+                />
+              </button>
+              <button
+                type="button"
                 onClick={(e) => {
                   e.stopPropagation();
                   const nextMuted = !isMuted;
@@ -347,8 +369,8 @@ export function ReelsPlayer({
 
       {heartAnim && (
         <div
-          className="pointer-events-none fixed z-50 animate-heart-pop text-6xl"
-          style={{ left: heartAnim.x - 30, top: heartAnim.y - 30 }}
+          className="pointer-events-none fixed z-50 animate-heart-pop text-7xl"
+          style={{ left: heartAnim.x - 36, top: heartAnim.y - 36, filter: 'drop-shadow(0 0 8px rgba(225,48,108,0.8))' }}
         >
           ❤️
         </div>
@@ -381,7 +403,7 @@ function ActionButton({
         e.stopPropagation();
         onClick();
       }}
-      className={`flex flex-col items-center gap-0.5 ${active ? 'text-red-500' : 'text-white'}`}
+      className={`flex flex-col items-center gap-0.5 ${active ? 'text-ig-accent' : 'text-white'}`}
     >
       <span className="drop-shadow-lg">{icon}</span>
       <span className="text-[11px] font-semibold drop-shadow">{count}</span>

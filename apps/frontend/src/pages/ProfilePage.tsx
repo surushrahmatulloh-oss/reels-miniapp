@@ -123,9 +123,9 @@ export function ProfilePage() {
         <button
           type="button"
           onClick={() => setEditing(!editing)}
-          className="mt-3 w-full rounded-lg bg-ig-surface py-1.5 text-sm font-semibold"
+          className="mt-3 w-full rounded-lg border border-ig-border bg-ig-surface py-1.5 text-sm font-semibold"
         >
-          {editing ? 'Бекор кардан' : 'Таҳрир кардан'}
+          {editing ? 'Бекор кардан' : 'Edit profile'}
         </button>
 
         <div className="mt-4 flex gap-4 overflow-x-auto scrollbar-hide pb-1">
@@ -174,7 +174,7 @@ export function ProfilePage() {
             <button
               onClick={() => saveMutation.mutate()}
               disabled={saveMutation.isPending}
-              className="w-full rounded-lg bg-tg-button py-2 text-sm font-medium text-tg-button-text"
+              className="w-full rounded-lg bg-ig-accent py-2 text-sm font-semibold text-white"
             >
               {saveMutation.isPending ? 'Нигоҳ мешавад...' : 'Нигоҳ доштан'}
             </button>
@@ -294,7 +294,7 @@ function SettingsPanel({
               key={c.id}
               onClick={() => toggleCat(c.id)}
               className={`rounded-full px-3 py-1 text-xs ${
-                categories.includes(c.id) ? 'bg-tg-button' : 'bg-white/10'
+                categories.includes(c.id) ? 'bg-ig-accent text-white' : 'bg-ig-surface'
               }`}
             >
               {c.emoji} {c.label}
@@ -311,7 +311,7 @@ function SettingsPanel({
               key={f.id}
               onClick={() => toggleFmt(f.id)}
               className={`rounded-full px-3 py-1 text-xs ${
-                formats.includes(f.id) ? 'bg-tg-button' : 'bg-white/10'
+                formats.includes(f.id) ? 'bg-ig-accent text-white' : 'bg-ig-surface'
               }`}
             >
               {f.label}
@@ -322,7 +322,7 @@ function SettingsPanel({
 
       <button
         onClick={() => void save()}
-        className="w-full rounded-xl bg-tg-button py-3 text-sm font-medium text-tg-button-text"
+        className="w-full rounded-xl bg-ig-accent py-3 text-sm font-semibold text-white"
       >
         Нигоҳ доштан
       </button>

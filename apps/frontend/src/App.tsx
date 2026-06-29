@@ -7,10 +7,10 @@ import { useTelegram } from '@/hooks';
 import { LoadingScreen } from '@/components/LoadingScreen';
 import { OnboardingPage } from '@/pages/OnboardingPage';
 import { FeedPage } from '@/pages/FeedPage';
+import { ReelsPage } from '@/pages/ReelsPage';
 import { ProfilePage } from '@/pages/ProfilePage';
 import { SearchPage } from '@/pages/SearchPage';
 import { CreatePage } from '@/pages/CreatePage';
-import { NotificationsPage } from '@/pages/NotificationsPage';
 import { ReelsOverlay } from '@/components/ReelsOverlay';
 
 const queryClient = new QueryClient({
@@ -47,13 +47,13 @@ function AppRoutes() {
   }, [initData, isAuthenticated, user, setAuth, isTelegram]);
 
   if (booting) {
-    return <LoadingScreen message="Воридшавӣ..." />;
+    return <LoadingScreen message="Telegram auth..." />;
   }
 
   if (error) {
     return (
       <div className="flex h-full flex-col items-center justify-center gap-4 bg-black px-6 text-center">
-        <p className="text-red-400">{error}</p>
+        <p className="text-ig-accent">{error}</p>
         <p className="text-sm text-ig-muted">
           {isTelegram
             ? 'Backend-ро санҷед ё як лаҳза интизор шавед (Render cold start).'
@@ -62,7 +62,7 @@ function AppRoutes() {
         {!isTelegram && (
           <a
             href="https://t.me/miniapprealsBot"
-            className="rounded-lg bg-ig-link px-6 py-3 text-sm font-semibold text-white"
+            className="rounded-lg bg-ig-accent px-6 py-3 text-sm font-semibold text-white"
           >
             Кушодан дар Telegram → @miniapprealsBot
           </a>
@@ -83,11 +83,12 @@ function AppRoutes() {
   return (
     <Routes>
       <Route path="/feed" element={<FeedPage />} />
+      <Route path="/reels" element={<ReelsPage />} />
       <Route path="/search" element={<SearchPage />} />
       <Route path="/create" element={<CreatePage />} />
-      <Route path="/notifications" element={<NotificationsPage />} />
       <Route path="/profile" element={<ProfilePage />} />
-      <Route path="*" element={<Navigate to="/feed" replace />} />
+      <Route path="/notifications" element={<Navigate to="/reels" replace />} />
+      <Route path="*" element={<Navigate to="/reels" replace />} />
     </Routes>
   );
 }
@@ -96,7 +97,7 @@ export default function App() {
   return (
     <QueryClientProvider client={queryClient}>
       <BrowserRouter>
-        <div className="h-full">
+        <div className="h-full bg-black text-white">
           <AppRoutes />
           <ReelsOverlay />
         </div>

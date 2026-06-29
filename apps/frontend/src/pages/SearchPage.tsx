@@ -12,6 +12,7 @@ import { IconSearch } from '@/components/icons/InstagramIcons';
 
 export function SearchPage() {
   const [query, setQuery] = useState('');
+  const [activeCategory, setActiveCategory] = useState<string | null>(null);
   const [debounced, setDebounced] = useState('');
   const openPlayback = useFeedStore((s) => s.openPlayback);
 
@@ -25,8 +26,8 @@ export function SearchPage() {
   };
 
   const { data: exploreVideos = [], isLoading: exploreLoading } = useQuery({
-    queryKey: ['search-explore'],
-    queryFn: () => searchVideos('reels'),
+    queryKey: ['search-explore', activeCategory],
+    queryFn: () => searchVideos(activeCategory ?? 'reels'),
     staleTime: 120_000,
   });
 
@@ -53,13 +54,13 @@ export function SearchPage() {
   return (
     <div className="flex h-full flex-col bg-black pb-14">
       <div className="sticky top-0 z-10 border-b border-ig-border bg-black px-4 py-3">
-        <div className="flex items-center gap-2 rounded-xl bg-ig-surface px-3 py-2">
+        <div className="flex items-center gap-2 rounded-xl bg-ig-surface px-3 py-2.5">
           <IconSearch className="h-5 w-5 text-ig-muted" />
           <input
             value={query}
             onChange={(e) => handleSearch(e.target.value)}
             placeholder="Ҷустуҷӯ"
-            className="flex-1 bg-transparent text-sm outline-none placeholder:text-ig-muted"
+            className="flex-1 bg-transparent text-sm text-white outline-none placeholder:text-ig-muted"
           />
         </div>
       </div>
@@ -70,8 +71,15 @@ export function SearchPage() {
             <button
               key={cat.id}
               type="button"
-              onClick={() => handleSearch(cat.id)}
-              className="shrink-0 rounded-full border border-ig-border px-3 py-1.5 text-xs"
+              onClick={() => {
+                setActiveCategory(cat.id);
+                handleSearch(cat.id);
+              }}
+              className={`shrink-0 rounded-full border px-3 py-1.5 text-xs font-medium transition ${
+                activeCategory === cat.id
+                  ? 'border-ig-accent bg-ig-accent/15 text-white'
+                  : 'border-ig-border text-ig-muted'
+              }`}
             >
               {cat.emoji} {cat.label}
             </button>

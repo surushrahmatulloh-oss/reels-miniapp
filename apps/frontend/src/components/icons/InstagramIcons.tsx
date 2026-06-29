@@ -92,11 +92,15 @@ export function IconMusic({ className }: IconProps) {
   );
 }
 
-export function IconReels({ className }: IconProps) {
-  return (
+export function IconReels({ className, filled }: IconProps) {
+  return filled ? (
+    <svg className={className} viewBox="0 0 24 24" fill="currentColor">
+      <path d="M3 5a2 2 0 012-2h14a2 2 0 012 2v14a2 2 0 01-2 2H5a2 2 0 01-2-2V5zm6.5 4.5v5l5-2.5-5-2.5z" />
+    </svg>
+  ) : (
     <svg className={className} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8">
       <rect x="3" y="3" width="18" height="18" rx="4" />
-      <path d="M7 7l10 5-10 5V7z" fill="currentColor" stroke="none" />
+      <path d="M10 8.5v7l6-3.5-6-3.5z" fill="currentColor" stroke="none" />
     </svg>
   );
 }
