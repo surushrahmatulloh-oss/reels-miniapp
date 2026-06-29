@@ -14,6 +14,7 @@ import { BottomNav } from '@/components/BottomNav';
 import { LoadingScreen } from '@/components/LoadingScreen';
 import { VideoGridTile } from '@/components/VideoGridTile';
 import { GridSkeleton } from '@/components/Skeleton';
+import { useTimedOut } from '@/hooks';
 import { toVideo } from '@/utils/video';
 import type { Video } from '@/types';
 
@@ -49,7 +50,8 @@ export function ProfilePage() {
       setUsername(me.username);
       return me;
     },
-    retry: false,
+    retry: 1,
+    staleTime: 30_000,
   });
 
   useEffect(() => {
@@ -59,16 +61,18 @@ export function ProfilePage() {
     }
   }, [meError, logout]);
 
+  const loadingTimedOut = useTimedOut(isLoading, 20_000);
+
   const { data: savedVideos = [] } = useQuery({
     queryKey: ['saved'],
     queryFn: getSavedVideos,
-    enabled: tab === 'saved' || tab === 'grid',
+    enabled: (tab === 'saved' || tab === 'grid') && !isLoading && !!user,
   });
 
   const { data: likedVideos = [] } = useQuery({
     queryKey: ['liked'],
     queryFn: getLikedVideos,
-    enabled: tab === 'grid',
+    enabled: tab === 'grid' && !isLoading && !!user,
   });
 
   const saveMutation = useMutation({
@@ -83,8 +87,28 @@ export function ProfilePage() {
     },
   });
 
+  if ((isLoading || !user) && !loadingTimedOut) {
+    return <LoadingScreen message="Профил бор мешавад..." />;
+  }
+
+  if (loadingTimedOut && !user) {
+    return (
+      <div className="flex h-full flex-col items-center justify-center gap-4 bg-black px-6">
+        <p className="text-ig-accent">Профил бор нашуд</p>
+        <button
+          type="button"
+          onClick={() => window.location.reload()}
+          className="rounded-xl bg-ig-accent px-6 py-2 text-sm font-semibold"
+        >
+          Боз кӯшиш
+        </button>
+        <BottomNav />
+      </div>
+    );
+  }
+
   if (isLoading || !user) {
-    return <LoadingScreen />;
+    return null;
   }
 
   const gridVideos: Video[] = (tab === 'saved' ? savedVideos : likedVideos).map((v) =>

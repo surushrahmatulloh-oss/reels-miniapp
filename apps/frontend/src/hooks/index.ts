@@ -1,9 +1,24 @@
-import { useEffect, useRef } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { io, type Socket } from 'socket.io-client';
 import { useAuthStore } from '@/store';
 import { useFeedStore } from '@/store';
 
 const WS_URL = import.meta.env.VITE_WS_URL ?? window.location.origin;
+
+export function useTimedOut(active: boolean, ms: number): boolean {
+  const [timedOut, setTimedOut] = useState(false);
+
+  useEffect(() => {
+    if (!active) {
+      setTimedOut(false);
+      return;
+    }
+    const t = setTimeout(() => setTimedOut(true), ms);
+    return () => clearTimeout(t);
+  }, [active, ms]);
+
+  return active && timedOut;
+}
 
 export function useSocket() {
   const socketRef = useRef<Socket | null>(null);

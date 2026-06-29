@@ -33,50 +33,25 @@ async function main() {
 
     if (isFallbackMode()) {
       db = 'fallback';
-    } else {
+    } else if (Video.db.readyState === 1) {
       try {
         videoCount = await Video.countDocuments();
       } catch {
-        /* mongoose not ready */
+        /* ignore */
       }
+    } else {
+      db = 'connecting';
     }
 
     res.json({
       status: 'ok',
-      version: '4.0.0',
+      version: '4.0.1',
       db,
       videos: videoCount,
       admin: true,
       timestamp: new Date().toISOString(),
     });
   });
-
-  await new Promise<void>((resolve) => {
-    server.listen(config.port, '0.0.0.0', () => {
-      console.log(`Backend listening on 0.0.0.0:${config.port}`);
-      resolve();
-    });
-  });
-
-  await connectDatabase();
-
-  try {
-    await connectRedis();
-  } catch {
-    console.warn('Redis unavailable — running without cache');
-  }
-
-  const io = new Server(server, {
-    cors: {
-      origin: (origin, callback) => {
-        if (isSocketOriginAllowed(origin)) callback(null, true);
-        else callback(new Error('Socket CORS blocked'));
-      },
-      methods: ['GET', 'POST'],
-    },
-  });
-
-  setupSockets(io);
 
   app.use(cors(corsOptions));
   app.use(express.json({ limit: '1mb' }));
@@ -125,10 +100,35 @@ async function main() {
     });
   }
 
+  const io = new Server(server, {
+    cors: {
+      origin: (origin, callback) => {
+        if (isSocketOriginAllowed(origin)) callback(null, true);
+        else callback(new Error('Socket CORS blocked'));
+      },
+      methods: ['GET', 'POST'],
+    },
+  });
+
+  setupSockets(io);
+
+  await new Promise<void>((resolve) => {
+    server.listen(config.port, '0.0.0.0', () => {
+      console.log(`Backend listening on 0.0.0.0:${config.port}`);
+      resolve();
+    });
+  });
+
+  void connectDatabase().then(() => console.log('Database ready'));
+  try {
+    await connectRedis();
+  } catch {
+    console.warn('Redis unavailable — running without cache');
+  }
+
   console.log('App routes ready');
 }
 
-// Prevent crash on unhandled errors
 process.on('unhandledRejection', (err) => {
   console.error('Unhandled rejection:', err);
 });

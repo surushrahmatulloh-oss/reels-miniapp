@@ -13,7 +13,22 @@ const API_URL = import.meta.env.VITE_API_URL ?? '';
 export const api = axios.create({
   baseURL: API_URL ? `${API_URL}/api` : '/api',
   headers: { 'Content-Type': 'application/json' },
+  timeout: 30_000,
 });
+
+api.interceptors.response.use(
+  (res) => res,
+  async (error: unknown) => {
+    const err = error as { config?: { _retry?: boolean }; response?: unknown; code?: string };
+    const config = err.config;
+    if (config && !config._retry && (!err.response || err.code === 'ECONNABORTED')) {
+      config._retry = true;
+      await new Promise((r) => setTimeout(r, 1500));
+      return api.request(config);
+    }
+    return Promise.reject(error);
+  },
+);
 
 export function setAuthToken(token: string | null) {
   if (token) {
@@ -165,4 +180,14 @@ export async function searchUsers(q: string) {
 export async function searchVideos(q: string) {
   const { data } = await api.get('/search/videos', { params: { q } });
   return data.videos as Video[];
+}
+
+export async function pingBackend(): Promise<boolean> {
+  try {
+    const base = API_URL || window.location.origin;
+    const res = await fetch(`${base}/health`, { signal: AbortSignal.timeout(15_000) });
+    return res.ok;
+  } catch {
+    return false;
+  }
 }
