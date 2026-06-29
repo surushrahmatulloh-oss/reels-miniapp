@@ -9,6 +9,9 @@ COPY apps/backend/package.json apps/backend/
 RUN pnpm install --frozen-lockfile
 
 COPY . .
+# Cache bust — forces full rebuild (same as Clear build cache on Render)
+ARG CACHEBUST=20260630-v433
+RUN echo "build ${CACHEBUST}"
 ENV VITE_API_URL=
 ENV VITE_WS_URL=
 RUN pnpm --filter backend build && pnpm --filter frontend build

@@ -13,6 +13,7 @@
     "seed": "pnpm --filter backend seed",
     "seed:videos": "pnpm --filter backend seed-videos",
     "seed:render": "node scripts/trigger-fetch-videos.mjs",
+    "deploy:render:clear": "node scripts/deploy-clear-cache.mjs",
     "autopush": "node scripts/watch-and-push.mjs",
     "autopush:once": "node scripts/auto-push.mjs",
     "hooks:install": "node scripts/install-git-hooks.mjs"
