@@ -1,10 +1,7 @@
-#!/bin/bash
-# Runs after every git commit — push to GitHub
+#!/bin/sh
+# Auto push to GitHub + Render deploy after every commit
 ROOT="$(git rev-parse --show-toplevel)"
-cd "$ROOT"
-
+cd "$ROOT" || exit 0
 if command -v node >/dev/null 2>&1 && [ -f "$ROOT/scripts/push-github.mjs" ]; then
-  node "$ROOT/scripts/push-github.mjs" || git push origin HEAD
-else
-  git push origin HEAD
+  node "$ROOT/scripts/push-github.mjs" || true
 fi

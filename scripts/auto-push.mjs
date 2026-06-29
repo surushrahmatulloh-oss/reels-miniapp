@@ -2,7 +2,7 @@
  * Auto add + commit + push (Windows / cross-platform)
  * Usage: node scripts/auto-push.mjs [commit message]
  */
-import { execSync } from 'child_process';
+import { execSync, spawnSync } from 'child_process';
 import path from 'path';
 import { fileURLToPath } from 'url';
 
@@ -39,7 +39,16 @@ run('git add -A');
 if (!runQuiet('git diff --cached --quiet')) {
   run(`git commit -m "${msg.replace(/"/g, '\\"')}"`);
   console.log('[auto-push] committed:', msg);
-  console.log('[auto-push] push via post-commit hook...');
+  console.log('[auto-push] push → GitHub → Render...');
+  const push = spawnSync(process.execPath, [path.join(__dirname, 'push-github.mjs')], {
+    cwd: root,
+    stdio: 'inherit',
+    shell: true,
+  });
+  if (push.status !== 0) {
+    console.warn('[auto-push] push failed — VPN/GitHub? Боз кӯшиш: node scripts/push-github.mjs');
+    process.exit(push.status ?? 1);
+  }
 } else {
   console.log('[auto-push] nothing to commit');
   process.exit(0);

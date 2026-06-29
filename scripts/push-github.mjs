@@ -29,6 +29,9 @@ const env = {
 
 const GITHUB_TOKEN = env.GITHUB_TOKEN ?? env.GH_TOKEN;
 const RENDER_DEPLOY_HOOK = env.RENDER_DEPLOY_HOOK;
+const RENDER_API_KEY = env.RENDER_API_KEY;
+const RENDER_SERVICE_NAME = env.RENDER_SERVICE_NAME ?? 'reels-miniapp';
+const RENDER_URL = env.RENDER_URL ?? 'https://reels-miniapp.onrender.com';
 
 function run(cmd, quiet = false) {
   if (!quiet) console.log(`> ${cmd.replace(GITHUB_TOKEN ?? '', '***')}`);
@@ -50,23 +53,69 @@ async function testGitHub() {
   return res.json();
 }
 
-async function triggerRenderDeploy() {
-  if (!RENDER_DEPLOY_HOOK) {
-    console.log('');
-    console.log('RENDER_DEPLOY_HOOK нест.');
-    console.log('→ Render Dashboard → reels-miniapp → Settings → Deploy Hook');
-    console.log('→ URL-ро дар .env.deploy гузоред: RENDER_DEPLOY_HOOK=...');
-    console.log('→ Ё дастӣ: Manual Deploy → Clear build cache & deploy');
-    return;
+async function renderApi(method, apiPath, body) {
+  const res = await fetch(`https://api.render.com/v1${apiPath}`, {
+    method,
+    headers: {
+      Authorization: `Bearer ${RENDER_API_KEY}`,
+      'Content-Type': 'application/json',
+    },
+    body: body ? JSON.stringify(body) : undefined,
+  });
+  const text = await res.text();
+  let data;
+  try {
+    data = JSON.parse(text);
+  } catch {
+    data = text;
   }
+  if (!res.ok) throw new Error(`Render ${res.status}: ${JSON.stringify(data)}`);
+  return data;
+}
 
-  console.log('[render] Deploy оғоз...');
-  const res = await fetch(RENDER_DEPLOY_HOOK, { method: 'POST' });
-  if (res.ok) {
-    console.log('[render] Deploy фиристода шуд ✓');
-  } else {
+async function findRenderService() {
+  let cursor;
+  do {
+    const q = cursor ? `?cursor=${encodeURIComponent(cursor)}` : '';
+    const page = await renderApi('GET', `/services${q}`);
+    for (const row of page) {
+      const svc = row.service ?? row;
+      if (svc.name === RENDER_SERVICE_NAME) return svc;
+    }
+    cursor = page.length ? page[page.length - 1]?.cursor : null;
+  } while (cursor);
+  throw new Error(`Service "${RENDER_SERVICE_NAME}" not found`);
+}
+
+async function triggerRenderDeployViaApi() {
+  const service = await findRenderService();
+  console.log(`[render] API deploy: ${service.name} (${service.id})`);
+  await renderApi('POST', `/services/${service.id}/deploys`, { clearCache: 'clear' });
+  console.log('[render] Deploy оғоз шуд (clear cache) ✓');
+}
+
+async function triggerRenderDeploy() {
+  if (RENDER_DEPLOY_HOOK) {
+    console.log('[render] Deploy hook...');
+    const res = await fetch(RENDER_DEPLOY_HOOK, { method: 'POST' });
+    if (res.ok) {
+      console.log('[render] Deploy фиристода шуд ✓');
+      return;
+    }
     console.warn(`[render] Deploy hook хато: ${res.status}`);
   }
+
+  if (RENDER_API_KEY?.startsWith('rnd_')) {
+    try {
+      await triggerRenderDeployViaApi();
+      return;
+    } catch (err) {
+      console.warn('[render] API deploy хато:', err.message);
+    }
+  }
+
+  console.log('[render] Auto-deploy аз GitHub (render.yaml autoDeploy: true)');
+  console.log(`[render] Санҷед: ${RENDER_URL}/health`);
 }
 
 async function main() {
@@ -119,8 +168,7 @@ async function main() {
 
   console.log('');
   console.log('Пас аз 5-7 дақиқа санҷед:');
-  console.log('https://reels-miniapp.onrender.com/health');
-  console.log('Бояд version: 2.3.1 ва videos: 27');
+  console.log(`${RENDER_URL}/health`);
 }
 
 main().catch((err) => {
