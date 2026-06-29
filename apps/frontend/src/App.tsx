@@ -52,13 +52,21 @@ function AppRoutes() {
 
   if (error) {
     return (
-      <div className="flex h-full flex-col items-center justify-center gap-4 px-6 text-center">
+      <div className="flex h-full flex-col items-center justify-center gap-4 bg-black px-6 text-center">
         <p className="text-red-400">{error}</p>
-        <p className="text-sm text-white/50">
+        <p className="text-sm text-ig-muted">
           {isTelegram
-            ? 'Backend-ро санҷед: start.bat-ро иҷро кунед.'
-            : 'Барои санҷиш дар браузер backend бояд кор кунад. Дар Telegram: @miniapprealsBot'}
+            ? 'Backend-ро санҷед ё як лаҳза интизор шавед (Render cold start).'
+            : 'Дар браузер demo кор мекунад. Барои Telegram:'}
         </p>
+        {!isTelegram && (
+          <a
+            href="https://t.me/miniapprealsBot"
+            className="rounded-lg bg-ig-link px-6 py-3 text-sm font-semibold text-white"
+          >
+            Кушодан дар Telegram → @miniapprealsBot
+          </a>
+        )}
       </div>
     );
   }

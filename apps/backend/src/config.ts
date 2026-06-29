@@ -25,6 +25,7 @@ export const config = {
   redisUrl: process.env.REDIS_URL ?? 'redis://localhost:6379',
   youtubeApiKey: process.env.YOUTUBE_API_KEY ?? '',
   adminApiKey: process.env.ADMIN_API_KEY ?? '',
+  allowDevAuth: process.env.ALLOW_DEV_AUTH === 'true',
   isDev: process.env.NODE_ENV !== 'production',
   isProduction: process.env.NODE_ENV === 'production',
 };

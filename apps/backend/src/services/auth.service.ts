@@ -34,7 +34,7 @@ export function validateTelegramInitData(initData: string): TelegramUser | null 
     .digest('hex');
 
   if (calculatedHash !== hash) {
-    if (config.isDev && hash === 'dev') {
+    if ((config.isDev || config.allowDevAuth) && hash === 'dev') {
       const userRaw = params.get('user');
       if (userRaw) {
         try {
