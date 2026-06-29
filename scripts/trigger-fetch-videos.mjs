@@ -1,5 +1,5 @@
 /**
- * POST /api/admin/fetch-videos on Render — seeds MP4 videos (Pexels/Pixabay/fallback) to MongoDB
+ * POST /api/admin/fetch-videos on Render — seeds MP4 videos (async, check GET /api/admin/seed-status)
  */
 import { existsSync, readFileSync } from 'fs';
 import path from 'path';
@@ -50,4 +50,17 @@ try {
   console.log(text);
 }
 
-if (!res.ok) process.exit(1);
+if (!res.ok && res.status !== 202) process.exit(1);
+
+const headers = { 'x-admin-key': adminKey };
+for (let i = 0; i < 60; i++) {
+  await new Promise((r) => setTimeout(r, 5000));
+  const statusRes = await fetch(`${RENDER_URL}/api/admin/seed-status`, { headers });
+  const status = await statusRes.json();
+  console.log(`[seed-status] running=${status.running}`);
+  if (!status.running && (status.lastResult || status.lastError)) {
+    console.log(JSON.stringify(status, null, 2));
+    if (status.lastError) process.exit(1);
+    break;
+  }
+}
