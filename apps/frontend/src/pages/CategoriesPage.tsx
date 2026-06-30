@@ -47,7 +47,8 @@ export function CategoriesPage() {
       setActiveCategories(selected);
       setVideos([]);
       setCurrentIndex(0);
-      void queryClient.invalidateQueries({ queryKey: ['feed'] });
+      useFeedStore.getState().setPagination(null, true);
+      void queryClient.removeQueries({ queryKey: ['feed'] });
 
       navigate('/reels', { replace: true });
     } catch {

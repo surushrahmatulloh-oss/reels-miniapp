@@ -2,8 +2,9 @@ import type { Video } from '@/types';
 
 const API_URL = (import.meta.env.VITE_API_URL ?? '').replace(/\/$/, '');
 
-/** Always same-origin proxy — reliable in Telegram WebView */
+/** Prefer direct CDN URL (audio clips) over media proxy */
 export function getPlayableUrl(video: Pick<Video, 'id' | 'url'> & { playUrl?: string }): string {
+  if (video.url?.startsWith('http')) return video.url;
   const path = video.playUrl ?? `/api/media/${video.id}.mp4`;
   if (path.startsWith('http')) return path;
   return API_URL ? `${API_URL}${path}` : path;

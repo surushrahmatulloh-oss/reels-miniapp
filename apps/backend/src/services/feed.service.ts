@@ -5,7 +5,7 @@ import { Like, Save } from '../models/Interaction.js';
 import { cacheGet, cacheSet } from '../redis.js';
 import type { VideoFormat } from '../types/index.js';
 import { normalizePlaybackUrl } from '../data/workingMp4Pool.js';
-import { urlHasAudio } from '../data/audioMp4Pool.js';
+import { urlHasAudio, getAudioUrlForCategory } from '../data/audioMp4Pool.js';
 import { CATEGORY_IDS, expandCategoryIds } from '../data/categories.js';
 
 const CATEGORIES = CATEGORY_IDS;
@@ -53,21 +53,27 @@ async function fetchUniqueFeedPage(
   return rows as unknown as IVideo[];
 }
 
-async function fetchAudioBoost(
-  baseMatch: Record<string, unknown>,
+/** Seeded audio clips per category — not filtered by watch history */
+async function fetchCategoryAudioClips(
   categories: string[],
   max: number,
 ): Promise<IVideo[]> {
   const rows = await Video.find({
-    ...baseMatch,
+    format: 'reels',
+    url: MP4_URL_FILTER,
     category: { $in: categories },
+    instagramId: { $regex: /^audio_/i },
   })
     .sort({ _id: -1 })
-    .limit(max * 4)
+    .limit(max * 2)
     .lean();
   return (rows as unknown as IVideo[])
     .filter((v) => urlHasAudio(v.url ?? ''))
     .slice(0, max);
+}
+
+function filterAudioOnly(videos: IVideo[]): IVideo[] {
+  return videos.filter((v) => urlHasAudio(v.url ?? ''));
 }
 
 export async function buildFeed(params: {
@@ -83,7 +89,7 @@ export async function buildFeed(params: {
   const strictCategories = params.categories.length > 0;
   const catKey = [...params.categories].sort().join('|') || 'default';
   const excludeKey = (params.excludeIds ?? []).slice(0, 50).join(',');
-  const cacheKey = `feed:v5:${params.userId}:${format}:${catKey}:${params.cursor ?? 'start'}:${limit}:${excludeKey}`;
+  const cacheKey = `feed:v6:${params.userId}:${format}:${catKey}:${params.cursor ?? 'start'}:${limit}:${excludeKey}`;
   const cached = await cacheGet<{ videos: IVideo[]; nextCursor: string | null; hasMore: boolean }>(
     cacheKey,
   );
@@ -118,40 +124,55 @@ export async function buildFeed(params: {
   const fetchSize = Math.max(limit * 3, 120);
   const categoryMatch = { ...baseMatch, category: { $in: preferredCategories } };
 
-  let page = await fetchUniqueFeedPage(categoryMatch, fetchSize);
+  let page: IVideo[] = [];
 
-  // Replay only within the same categories (never mix other categories)
-  if (page.length === 0 && strictCategories) {
-    const replayMatch: Record<string, unknown> = {
-      format,
-      url: MP4_URL_FILTER,
-      category: { $in: preferredCategories },
-    };
-    if (params.cursor && mongoose.Types.ObjectId.isValid(params.cursor)) {
-      replayMatch._id = { $lt: new mongoose.Types.ObjectId(params.cursor) };
+  if (strictCategories) {
+    const audioClips = await fetchCategoryAudioClips(preferredCategories, limit);
+    const pexelsPage = filterAudioOnly(await fetchUniqueFeedPage(categoryMatch, fetchSize));
+    page = dedupeByUrl([...audioClips, ...pexelsPage], limit + 5);
+
+    if (page.length === 0) {
+      const replayMatch: Record<string, unknown> = {
+        format,
+        url: MP4_URL_FILTER,
+        category: { $in: preferredCategories },
+      };
+      if (params.cursor && mongoose.Types.ObjectId.isValid(params.cursor)) {
+        replayMatch._id = { $lt: new mongoose.Types.ObjectId(params.cursor) };
+      }
+      const replayAudio = await fetchCategoryAudioClips(preferredCategories, limit);
+      const replayPexels = filterAudioOnly(await fetchUniqueFeedPage(replayMatch, fetchSize));
+      page = dedupeByUrl([...replayAudio, ...replayPexels], limit + 5);
     }
-    page = await fetchUniqueFeedPage(replayMatch, fetchSize);
-  }
+  } else {
+    page = await fetchUniqueFeedPage(categoryMatch, fetchSize);
 
-  if (page.length === 0 && !strictCategories) {
-    const replayMatch: Record<string, unknown> = { format, url: MP4_URL_FILTER };
-    if (params.cursor && mongoose.Types.ObjectId.isValid(params.cursor)) {
-      replayMatch._id = { $lt: new mongoose.Types.ObjectId(params.cursor) };
+    if (page.length === 0) {
+      const replayMatch: Record<string, unknown> = { format, url: MP4_URL_FILTER };
+      if (params.cursor && mongoose.Types.ObjectId.isValid(params.cursor)) {
+        replayMatch._id = { $lt: new mongoose.Types.ObjectId(params.cursor) };
+      }
+      page = await fetchUniqueFeedPage(replayMatch, fetchSize);
     }
-    page = await fetchUniqueFeedPage(replayMatch, fetchSize);
+
+    if (page.length <= limit) {
+      const extra = await fetchUniqueFeedPage(
+        { ...baseMatch, category: { $nin: preferredCategories } },
+        fetchSize,
+      );
+      page = dedupeByUrl([...page, ...extra], limit + 25);
+    }
+
+    page.sort((a, b) => Number(urlHasAudio(b.url ?? '')) - Number(urlHasAudio(a.url ?? '')));
   }
 
-  if (!strictCategories && page.length <= limit) {
-    const extra = await fetchUniqueFeedPage(
-      { ...baseMatch, category: { $nin: preferredCategories } },
-      fetchSize,
-    );
-    page = dedupeByUrl([...page, ...extra], limit + 25);
+  if (strictCategories) {
+    page = page.filter((v) => {
+      const cat = v.category?.toLowerCase() ?? '';
+      return preferredCategories.includes(cat);
+    });
+    page = filterAudioOnly(page);
   }
-
-  const audioBoost = await fetchAudioBoost(baseMatch, preferredCategories, 3);
-  page = dedupeByUrl([...audioBoost, ...page], limit + 3);
-  page.sort((a, b) => Number(urlHasAudio(b.url ?? '')) - Number(urlHasAudio(a.url ?? '')));
 
   const hasMore = page.length >= limit;
   page = page.slice(0, limit);
@@ -165,7 +186,7 @@ export async function buildFeed(params: {
     hasMore,
   };
 
-  await cacheSet(cacheKey, result, 20);
+  await cacheSet(cacheKey, result, 15);
   return result;
 }
 
@@ -185,12 +206,24 @@ export async function enrichVideos(
 
   return videos.map((video) => {
     const id = video._id.toString();
-    const playbackUrl = normalizePlaybackUrl(video.url);
+    let playbackUrl = normalizePlaybackUrl(video.url);
+    let hasAudio = urlHasAudio(playbackUrl);
+
+    if (!hasAudio) {
+      const fallback = getAudioUrlForCategory(video.category);
+      if (fallback) {
+        playbackUrl = fallback;
+        hasAudio = true;
+      }
+    }
+
+    const useDirect = playbackUrl.startsWith('http');
+
     return {
       id,
       instagramId: video.instagramId,
       url: playbackUrl,
-      playUrl: `/api/media/${id}.mp4`,
+      playUrl: useDirect ? playbackUrl : `/api/media/${id}.mp4`,
       thumbnailUrl: video.thumbnailUrl,
       title: video.title,
       format: video.format,
@@ -200,7 +233,7 @@ export async function enrichVideos(
       authorName: video.authorName,
       authorAvatar: video.authorAvatar,
       musicTitle: video.musicTitle,
-      hasAudio: urlHasAudio(video.url ?? ''),
+      hasAudio,
       likes: video.likes,
       views: video.views,
       commentsCount: video.commentsCount,

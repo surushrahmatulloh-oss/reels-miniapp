@@ -246,9 +246,20 @@ export function fallbackGetFeed(
   }
 
   const pageIds = unseenIds.slice(start, start + limit);
-  const page = pageIds
+  let page = pageIds
     .map((id) => getVideoById(id))
     .filter((v): v is MemoryVideo => Boolean(v));
+
+  if (preferred.length > 0) {
+    const expanded = expandCategoryIds(preferred);
+    page = page.filter(
+      (v) =>
+        expanded.includes(v.category.toLowerCase()) && urlHasAudio(v.url),
+    );
+  } else {
+    page = page.filter((v) => urlHasAudio(v.url));
+  }
+
   const sorted = [...page].sort(
     (a, b) => Number(urlHasAudio(b.url)) - Number(urlHasAudio(a.url)),
   );

@@ -224,12 +224,21 @@ export function ReelsPlayer({
     userPausedRef.current = false;
     playBlockedRef.current = false;
     setShowPlayBtn(false);
-    startPlayback(currentIndex, {
-      withSound: !isMutedRef.current,
-      allowMutedFallback: true,
-    });
 
     const video = videos[currentIndex];
+    const wantSound =
+      video?.hasAudio !== false && (isSoundUnlocked() || !isMutedRef.current);
+
+    if (wantSound && isMutedRef.current) {
+      isMutedRef.current = false;
+      setIsMuted(false);
+    }
+
+    startPlayback(currentIndex, {
+      withSound: wantSound,
+      allowMutedFallback: !wantSound,
+    });
+
     if (!video) return;
 
     const timer = window.setTimeout(() => {

@@ -21,7 +21,7 @@ import { ensureCategoryAudioClips } from './services/categoryAudioSeed.service.j
 import { videos, isFallbackMode } from './store/fallback.js';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
-const APP_VERSION = '5.1.1';
+const APP_VERSION = '5.2.0';
 
 async function main() {
   const app = express();
@@ -105,9 +105,9 @@ async function main() {
     });
   });
 
-  void connectDatabase().then(() => {
+  void connectDatabase().then(async () => {
     console.log('Database ready');
-    void ensureCategoryAudioClips().catch((err) =>
+    await ensureCategoryAudioClips().catch((err) =>
       console.warn('[audio-seed] ensure failed:', err),
     );
   });

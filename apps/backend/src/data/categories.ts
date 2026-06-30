@@ -20,7 +20,7 @@ export const CATEGORY_IDS = APP_CATEGORIES.map((c) => c.id);
 const LEGACY_MAP: Record<string, string[]> = {
   cars: ['cars', 'automotive', 'business'],
   sport: ['sport', 'fitness', 'dance'],
-  football: ['football', 'sport'],
+  football: ['football', 'sport', 'fitness'],
   music: ['music', 'dance'],
   cinema: ['cinema', 'entertainment', 'animation', 'art'],
   tech: ['tech', 'technology', 'science'],

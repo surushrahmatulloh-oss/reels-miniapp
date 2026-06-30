@@ -1,4 +1,4 @@
-import { useEffect, useCallback, useRef, useState } from 'react';
+import { useEffect, useCallback, useRef, useState, useMemo } from 'react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { useNavigate } from 'react-router-dom';
 import { getFeed } from '@/api/client';
@@ -7,8 +7,9 @@ import { useSocket } from '@/hooks';
 import { ReelsPlayer } from '@/components/ReelsPlayer';
 import { BottomNav } from '@/components/BottomNav';
 import { FeedSkeleton } from '@/components/Skeleton';
+import { videoMatchesCategories } from '@/utils/categoryFilter';
 
-const APP_VERSION = '5.1.1';
+const APP_VERSION = '5.2.0';
 
 export function ReelsPage() {
   useSocket();
@@ -20,11 +21,11 @@ export function ReelsPage() {
   const user = useAuthStore((s) => s.user);
   const activeCategories = useFeedStore((s) => s.activeCategories);
   const feedCategories =
-    user?.preferences.categories?.length
-      ? user.preferences.categories
-      : activeCategories?.length
-        ? activeCategories
-        : [];
+    activeCategories?.length
+      ? activeCategories
+      : user?.preferences.categories ?? [];
+
+  const feedKeyStr = feedCategories.join(',');
 
   useEffect(() => {
     if (feedCategories.length === 0) {
@@ -37,9 +38,11 @@ export function ReelsPage() {
     if (prev !== APP_VERSION) {
       localStorage.setItem('reels_app_version', APP_VERSION);
       localStorage.removeItem('reels:muted');
+      sessionStorage.removeItem('reels:soundUnlocked');
       useFeedStore.getState().setVideos([]);
       useFeedStore.getState().setCurrentIndex(0);
       useFeedStore.getState().setPagination(null, true);
+      useFeedStore.getState().setActiveCategories(null);
       void queryClient.invalidateQueries({ queryKey: ['feed'] });
     }
   }, [queryClient]);
@@ -49,26 +52,45 @@ export function ReelsPage() {
   const hasMore = useFeedStore((s) => s.hasMore);
   const setVideos = useFeedStore((s) => s.setVideos);
   const setPagination = useFeedStore((s) => s.setPagination);
+  const setCurrentIndex = useFeedStore((s) => s.setCurrentIndex);
 
-  const feedKey = ['feed', feedCategories.join(',')] as const;
+  const feedKey = ['feed', feedKeyStr] as const;
 
-  const { isLoading, isError, refetch } = useQuery({
+  useEffect(() => {
+    setVideos([]);
+    setCurrentIndex(0);
+    setPagination(null, true);
+    void queryClient.invalidateQueries({ queryKey: ['feed'] });
+  }, [feedKeyStr, setVideos, setCurrentIndex, setPagination, queryClient]);
+
+  const { isLoading, isError, refetch, isFetching } = useQuery({
     queryKey: feedKey,
     queryFn: async () => {
       const data = await getFeed({
         limit: 20,
         format: 'reels',
-        categories: feedCategories.length ? feedCategories : undefined,
+        categories: feedCategories,
       });
-      setVideos(data.videos);
+      const filtered = data.videos.filter(
+        (v) => videoMatchesCategories(v, feedCategories) && v.hasAudio !== false,
+      );
+      setVideos(filtered);
       setPagination(data.nextCursor, data.hasMore);
       setLoadError(null);
-      return data;
+      return { ...data, videos: filtered };
     },
-    staleTime: 30_000,
+    staleTime: 10_000,
     refetchOnMount: 'always',
     enabled: feedCategories.length > 0,
   });
+
+  const displayVideos = useMemo(
+    () =>
+      videos.filter(
+        (v) => videoMatchesCategories(v, feedCategories) && v.hasAudio !== false,
+      ),
+    [videos, feedCategories],
+  );
 
   const loadMore = useCallback(async () => {
     if (!hasMore || loadingMoreRef.current || !nextCursor) return;
@@ -79,11 +101,14 @@ export function ReelsPage() {
         limit: 20,
         cursor: nextCursor,
         format: 'reels',
-        categories: feedCategories.length ? feedCategories : undefined,
+        categories: feedCategories,
         excludeIds: loadedIds,
       });
-      if (data.videos.length > 0) {
-        setVideos(data.videos, true);
+      const filtered = data.videos.filter(
+        (v) => videoMatchesCategories(v, feedCategories) && v.hasAudio !== false,
+      );
+      if (filtered.length > 0) {
+        setVideos(filtered, true);
         setPagination(data.nextCursor, data.hasMore);
       } else {
         setPagination(null, false);
@@ -99,7 +124,7 @@ export function ReelsPage() {
     return null;
   }
 
-  if (isLoading && videos.length === 0) {
+  if ((isLoading || isFetching) && displayVideos.length === 0) {
     return (
       <div className="reels-viewport bg-black pb-[52px]">
         <FeedSkeleton />
@@ -108,7 +133,7 @@ export function ReelsPage() {
     );
   }
 
-  if ((isError || videos.length === 0) && !isLoading) {
+  if ((isError || displayVideos.length === 0) && !isLoading && !isFetching) {
     return (
       <div className="reels-viewport flex flex-col items-center justify-center gap-4 bg-black pb-[52px] text-white/70">
         <p>{loadError ?? 'Видё дар ин категория нест.'}</p>
@@ -133,7 +158,7 @@ export function ReelsPage() {
 
   return (
     <div className="reels-viewport relative bg-black pb-[52px]">
-      <ReelsPlayer videos={videos} onLoadMore={() => void loadMore()} immersive />
+      <ReelsPlayer videos={displayVideos} onLoadMore={() => void loadMore()} immersive />
       <BottomNav />
     </div>
   );
