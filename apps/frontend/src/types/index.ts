@@ -32,7 +32,6 @@ export interface Video {
   category: string;
   hashtags: string[];
   caption: string;
-  title?: string;
   authorName: string;
   authorAvatar: string;
   musicTitle: string;

@@ -266,8 +266,8 @@ function SettingsPanel({
   const [settingsError, setSettingsError] = useState('');
 
   const save = async () => {
-    if (categories.length < 3) {
-      setSettingsError('Ақаллан 3 категория интихоб кунед');
+    if (categories.length < 1) {
+      setSettingsError('Ҳадди ақал 1 категория интихоб кунед');
       return;
     }
     try {
