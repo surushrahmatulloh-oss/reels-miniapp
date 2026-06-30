@@ -17,10 +17,11 @@ import searchRoutes from './routes/search.routes.js';
 import adminRoutes from './routes/admin.routes.js';
 import { streamMedia } from './controllers/media.controller.js';
 import { setupSockets } from './sockets/index.js';
+import { ensureCategoryAudioClips } from './services/categoryAudioSeed.service.js';
 import { videos, isFallbackMode } from './store/fallback.js';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
-const APP_VERSION = '5.1.0';
+const APP_VERSION = '5.1.1';
 
 async function main() {
   const app = express();
@@ -104,7 +105,12 @@ async function main() {
     });
   });
 
-  void connectDatabase().then(() => console.log('Database ready'));
+  void connectDatabase().then(() => {
+    console.log('Database ready');
+    void ensureCategoryAudioClips().catch((err) =>
+      console.warn('[audio-seed] ensure failed:', err),
+    );
+  });
   void connectRedis().catch(() => console.warn('Redis unavailable — running without cache'));
 
   console.log('App routes ready');

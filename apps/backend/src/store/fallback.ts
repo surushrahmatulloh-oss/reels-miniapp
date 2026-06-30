@@ -65,6 +65,7 @@ const VIDEO_SOURCES: Array<{ url: string; category: (typeof CATEGORIES)[number] 
   { url: `${GCS}/ForBiggerEscapes.mp4`, category: 'travel' },
   { url: `${GCS}/ForBiggerFun.mp4`, category: 'entertainment' },
   { url: `${GCS}/ForBiggerJoyrides.mp4`, category: 'sport' },
+  { url: `${GCS}/ForBiggerJoyrides.mp4`, category: 'football' },
   { url: `${GCS}/ForBiggerMeltdowns.mp4`, category: 'music' },
   { url: `${GCS}/Sintel.mp4`, category: 'animation' },
   { url: `${GCS}/BigBuckBunny.mp4`, category: 'animation' },
@@ -93,6 +94,7 @@ const VIDEO_SOURCES: Array<{ url: string; category: (typeof CATEGORIES)[number] 
 const CAPTIONS: Record<string, string[]> = {
   music: ['🔥 Trending sound', '🎵 Мусиқии нав', '💿 Хитҳои имрӯза', '🎤 Reels мусиқӣ'],
   sport: ['⚽ Goals only', '💪 Fitness vibes', '🏃 Workout mode', '🔥 Sport energy'],
+  football: ['⚽ Футбол', '🥅 Голҳои зебо', '🏆 Match day', '🔥 Football vibes'],
   nature: ['🌿 Табиати зебо', '🌸 Bahor vibes', '🏔️ Travel mood', '🌊 Ocean calm'],
   food: ['🍳 Recipe reel', '😋 Food porn', '👨‍🍳 Quick cook', '🍕 Yummy content'],
   travel: ['✈️ Wanderlust', '🌍 Explore more', '📍 Hidden gems', '🛫 Travel diary'],
@@ -119,12 +121,13 @@ const CREATOR_NAMES = [
 ];
 
 function buildCatalog(): MemoryVideo[] {
-  const seenUrls = new Set<string>();
+  const seenKeys = new Set<string>();
   const list: MemoryVideo[] = [];
 
   for (const src of VIDEO_SOURCES) {
-    if (seenUrls.has(src.url)) continue;
-    seenUrls.add(src.url);
+    const dedupeKey = `${src.url}:${src.category}`;
+    if (seenKeys.has(dedupeKey)) continue;
+    seenKeys.add(dedupeKey);
 
     const idx = list.length;
     const cat = src.category;

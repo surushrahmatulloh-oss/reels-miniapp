@@ -27,10 +27,14 @@ async function getWatchedIds(userId: string, limit = 300): Promise<Set<string>> 
 
 function dedupeByUrl(videos: IVideo[], limit: number): IVideo[] {
   const seenUrls = new Set<string>();
+  const seenIds = new Set<string>();
   const out: IVideo[] = [];
   for (const v of videos) {
-    const key = v.url?.trim() || v._id.toString();
+    const id = v._id.toString();
+    if (seenIds.has(id)) continue;
+    const key = v.url?.trim() || id;
     if (seenUrls.has(key)) continue;
+    seenIds.add(id);
     seenUrls.add(key);
     out.push(v);
     if (out.length >= limit) break;
@@ -49,6 +53,23 @@ async function fetchUniqueFeedPage(
   return rows as unknown as IVideo[];
 }
 
+async function fetchAudioBoost(
+  baseMatch: Record<string, unknown>,
+  categories: string[],
+  max: number,
+): Promise<IVideo[]> {
+  const rows = await Video.find({
+    ...baseMatch,
+    category: { $in: categories },
+  })
+    .sort({ _id: -1 })
+    .limit(max * 4)
+    .lean();
+  return (rows as unknown as IVideo[])
+    .filter((v) => urlHasAudio(v.url ?? ''))
+    .slice(0, max);
+}
+
 export async function buildFeed(params: {
   userId: string;
   categories: string[];
@@ -59,15 +80,17 @@ export async function buildFeed(params: {
 }): Promise<{ videos: IVideo[]; nextCursor: string | null; hasMore: boolean }> {
   const limit = Math.min(params.limit ?? 20, 60);
   const format = params.format ?? 'reels';
+  const strictCategories = params.categories.length > 0;
+  const catKey = [...params.categories].sort().join('|') || 'default';
   const excludeKey = (params.excludeIds ?? []).slice(0, 50).join(',');
-  const cacheKey = `feed:v4:${params.userId}:${format}:${params.cursor ?? 'start'}:${limit}:${excludeKey}`;
+  const cacheKey = `feed:v5:${params.userId}:${format}:${catKey}:${params.cursor ?? 'start'}:${limit}:${excludeKey}`;
   const cached = await cacheGet<{ videos: IVideo[]; nextCursor: string | null; hasMore: boolean }>(
     cacheKey,
   );
   if (cached) return cached;
 
   const preferredCategories = expandCategoryIds(
-    params.categories.length > 0 ? params.categories : CATEGORIES.slice(0, 6),
+    strictCategories ? params.categories : CATEGORIES.slice(0, 6),
   );
 
   const watched = await getWatchedIds(params.userId);
@@ -93,20 +116,24 @@ export async function buildFeed(params: {
   }
 
   const fetchSize = Math.max(limit * 3, 120);
-  let page = await fetchUniqueFeedPage(
-    { ...baseMatch, category: { $in: preferredCategories } },
-    fetchSize,
-  );
+  const categoryMatch = { ...baseMatch, category: { $in: preferredCategories } };
 
-  if (page.length <= limit) {
-    const extra = await fetchUniqueFeedPage(
-      { ...baseMatch, category: { $nin: preferredCategories } },
-      fetchSize,
-    );
-    page = dedupeByUrl([...page, ...extra], limit + 25);
+  let page = await fetchUniqueFeedPage(categoryMatch, fetchSize);
+
+  // Replay only within the same categories (never mix other categories)
+  if (page.length === 0 && strictCategories) {
+    const replayMatch: Record<string, unknown> = {
+      format,
+      url: MP4_URL_FILTER,
+      category: { $in: preferredCategories },
+    };
+    if (params.cursor && mongoose.Types.ObjectId.isValid(params.cursor)) {
+      replayMatch._id = { $lt: new mongoose.Types.ObjectId(params.cursor) };
+    }
+    page = await fetchUniqueFeedPage(replayMatch, fetchSize);
   }
 
-  if (page.length === 0) {
+  if (page.length === 0 && !strictCategories) {
     const replayMatch: Record<string, unknown> = { format, url: MP4_URL_FILTER };
     if (params.cursor && mongoose.Types.ObjectId.isValid(params.cursor)) {
       replayMatch._id = { $lt: new mongoose.Types.ObjectId(params.cursor) };
@@ -114,9 +141,20 @@ export async function buildFeed(params: {
     page = await fetchUniqueFeedPage(replayMatch, fetchSize);
   }
 
+  if (!strictCategories && page.length <= limit) {
+    const extra = await fetchUniqueFeedPage(
+      { ...baseMatch, category: { $nin: preferredCategories } },
+      fetchSize,
+    );
+    page = dedupeByUrl([...page, ...extra], limit + 25);
+  }
+
+  const audioBoost = await fetchAudioBoost(baseMatch, preferredCategories, 3);
+  page = dedupeByUrl([...audioBoost, ...page], limit + 3);
+  page.sort((a, b) => Number(urlHasAudio(b.url ?? '')) - Number(urlHasAudio(a.url ?? '')));
+
   const hasMore = page.length >= limit;
   page = page.slice(0, limit);
-  page.sort((a, b) => Number(urlHasAudio(b.url ?? '')) - Number(urlHasAudio(a.url ?? '')));
 
   const nextCursor =
     hasMore && page.length > 0 ? page[page.length - 1]!._id.toString() : null;
@@ -154,7 +192,6 @@ export async function enrichVideos(
       url: playbackUrl,
       playUrl: `/api/media/${id}.mp4`,
       thumbnailUrl: video.thumbnailUrl,
-      title: video.title,
       title: video.title,
       format: video.format,
       category: video.category,

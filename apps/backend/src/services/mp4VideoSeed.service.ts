@@ -1,5 +1,5 @@
 import { Video } from '../models/Video.js';
-import { SEED_CATEGORIES } from '../data/youtubeSamplePool.js';
+import { CATEGORY_IDS } from '../data/categories.js';
 import {
   fetchVideosForCategory,
   isFakeSeedUrl,
@@ -32,7 +32,7 @@ export async function seedMp4Videos(options?: {
 
   const targetTotal = options?.targetTotal ?? TARGET_TOTAL;
   const perCategory =
-    options?.perCategory ?? Math.ceil(targetTotal / SEED_CATEGORIES.length);
+    options?.perCategory ?? Math.ceil(targetTotal / CATEGORY_IDS.length);
 
   let deleted = 0;
   if (options?.wipeAll) {
@@ -47,7 +47,7 @@ export async function seedMp4Videos(options?: {
   let globalIndex = 0;
   const byCategory: Record<string, number> = {};
 
-  for (const category of SEED_CATEGORIES) {
+  for (const category of CATEGORY_IDS) {
     byCategory[category] = 0;
     const pool = await fetchVideosForCategory(category, perCategory, existingKeys);
     const docs = [];

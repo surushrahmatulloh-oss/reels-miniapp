@@ -19,24 +19,36 @@ import { savePersistedStore } from '../persist.js';
 import { resolveCategoryQuery, isFormatQuery, expandCategoryIds } from '../utils/categorySearch.js';
 import { urlHasAudio } from '../data/audioMp4Pool.js';
 
-/** Stable feed order per user — pagination without re-shuffle */
+/** Stable feed order per user + category set */
 const feedOrders = new Map<string, string[]>();
 
+function feedOrderKey(userId: string, preferred: string[]): string {
+  return `${userId}:${[...preferred].sort().join('|')}`;
+}
+
+function videoMatchesCategories(v: MemoryVideo, preferred: string[]): boolean {
+  if (preferred.length === 0) return true;
+  const expanded = expandCategoryIds(preferred);
+  return (
+    expanded.includes(v.category) ||
+    v.hashtags.some((h) => expanded.includes(h.toLowerCase()))
+  );
+}
+
 function getUserFeedOrder(userId: string, preferred: string[]): string[] {
-  const existing = feedOrders.get(userId);
-  if (existing && existing.length === videos.length) return existing;
+  const orderKey = feedOrderKey(userId, preferred);
+  const existing = feedOrders.get(orderKey);
+  if (existing && existing.length > 0) return existing;
 
   let ordered = [...videos];
   if (preferred.length > 0) {
-    const pref = ordered.filter((v) => preferred.includes(v.category));
-    const rest = ordered.filter((v) => !preferred.includes(v.category));
-    ordered = [...shuffleVideos(pref), ...shuffleVideos(rest)];
+    ordered = shuffleVideos(ordered.filter((v) => videoMatchesCategories(v, preferred)));
   } else {
     ordered = shuffleVideos(ordered);
   }
 
   const ids = ordered.map((v) => v.id);
-  feedOrders.set(userId, ids);
+  feedOrders.set(orderKey, ids);
   return ids;
 }
 
@@ -155,6 +167,7 @@ export function fallbackUpdatePreferences(
   if (data.language) user.preferences.language = data.language;
   user.onboardingCompleted = true;
   users.set(userId, user);
+  feedOrders.clear();
   savePersistedStore();
   return serializeMemoryUser(user);
 }
@@ -206,9 +219,17 @@ function matchesQuery(v: MemoryVideo, q: string): boolean {
   );
 }
 
-export function fallbackGetFeed(userId: string, limit = 10, cursor?: string) {
+export function fallbackGetFeed(
+  userId: string,
+  limit = 10,
+  cursor?: string,
+  categoriesFromQuery: string[] = [],
+) {
   const user = users.get(userId);
-  const preferred = user?.preferences.categories ?? [];
+  const preferred =
+    categoriesFromQuery.length > 0
+      ? categoriesFromQuery
+      : (user?.preferences.categories ?? []);
   const order = getUserFeedOrder(userId, preferred);
 
   let unseenIds = order.filter((id) => !views.has(key(userId, id)));
@@ -228,7 +249,10 @@ export function fallbackGetFeed(userId: string, limit = 10, cursor?: string) {
   const page = pageIds
     .map((id) => getVideoById(id))
     .filter((v): v is MemoryVideo => Boolean(v));
-  const enriched = page.map((v) => enrichVideo(v, userId));
+  const sorted = [...page].sort(
+    (a, b) => Number(urlHasAudio(b.url)) - Number(urlHasAudio(a.url)),
+  );
+  const enriched = sorted.map((v) => enrichVideo(v, userId));
 
   return {
     videos: enriched,

@@ -16,9 +16,16 @@ export async function getFeed(req: AuthRequest, res: Response): Promise<void> {
   const excludeIds = excludeIdsRaw
     ? excludeIdsRaw.split(',').map((s) => s.trim()).filter(Boolean)
     : [];
+  const categoriesFromQuery =
+    typeof req.query.categories === 'string'
+      ? req.query.categories
+          .split(',')
+          .map((s) => s.trim().toLowerCase())
+          .filter(Boolean)
+      : [];
 
   if (isFallbackMode()) {
-    res.json(fb.fallbackGetFeed(req.user!.userId, limit, cursor));
+    res.json(fb.fallbackGetFeed(req.user!.userId, limit, cursor, categoriesFromQuery));
     return;
   }
 
@@ -28,13 +35,6 @@ export async function getFeed(req: AuthRequest, res: Response): Promise<void> {
   }
 
   const format = (req.query.format as VideoFormat | undefined) ?? 'reels';
-  const categoriesFromQuery =
-    typeof req.query.categories === 'string'
-      ? req.query.categories
-          .split(',')
-          .map((s) => s.trim().toLowerCase())
-          .filter(Boolean)
-      : [];
 
   const user = await User.findById(req.user!.userId);
   if (!user) {

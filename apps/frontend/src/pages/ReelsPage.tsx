@@ -8,7 +8,7 @@ import { ReelsPlayer } from '@/components/ReelsPlayer';
 import { BottomNav } from '@/components/BottomNav';
 import { FeedSkeleton } from '@/components/Skeleton';
 
-const APP_VERSION = '5.1.0';
+const APP_VERSION = '5.1.1';
 
 export function ReelsPage() {
   useSocket();
@@ -20,7 +20,11 @@ export function ReelsPage() {
   const user = useAuthStore((s) => s.user);
   const activeCategories = useFeedStore((s) => s.activeCategories);
   const feedCategories =
-    activeCategories?.length ? activeCategories : user?.preferences.categories ?? [];
+    user?.preferences.categories?.length
+      ? user.preferences.categories
+      : activeCategories?.length
+        ? activeCategories
+        : [];
 
   useEffect(() => {
     if (feedCategories.length === 0) {
