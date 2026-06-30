@@ -117,9 +117,11 @@ export function ReelsPlayer({
   const playBlockedRef = useRef(false);
   const playGenRef = useRef(0);
   const userGestureRef = useRef(false);
+  const soundUnlockedRef = useRef(false);
   const [heartAnim, setHeartAnim] = useState<{ x: number; y: number } | null>(null);
   const [commentsOpen, setCommentsOpen] = useState(false);
   const [showPlayBtn, setShowPlayBtn] = useState(false);
+  const [showSoundHint, setShowSoundHint] = useState(false);
 
   const storeIndex = useFeedStore((s) => s.currentIndex);
   const setStoreIndex = useFeedStore((s) => s.setCurrentIndex);
@@ -127,12 +129,41 @@ export function ReelsPlayer({
   const setCurrentIndex = onIndexChange ?? setStoreIndex;
   const [isMuted, setIsMuted] = useState<boolean>(() => {
     const raw = window.localStorage.getItem('reels:muted');
-    // Telegram/WebView blocks autoplay with sound — default muted so playback starts.
-    return raw == null ? true : raw === '1';
+    const savedUnlocked = window.localStorage.getItem('reels:soundUnlocked') === '1';
+    if (savedUnlocked) soundUnlockedRef.current = true;
+    // After first unlock, default to sound on; first visit starts muted for autoplay.
+    if (raw != null) return raw === '1';
+    return !savedUnlocked;
   });
   const updateVideo = useFeedStore((s) => s.updateVideo);
   const recoverAttemptsRef = useRef<Map<number, number>>(new Map());
   const currentVideoId = videos[currentIndex]?.id;
+
+  const unlockSound = useCallback(
+    (index: number, reason: string) => {
+      userGestureRef.current = true;
+      if (soundUnlockedRef.current) return false;
+
+      soundUnlockedRef.current = true;
+      window.localStorage.setItem('reels:soundUnlocked', '1');
+      setIsMuted(false);
+      setShowSoundHint(false);
+
+      const el = videoRefs.current.get(index);
+      if (el) {
+        el.muted = false;
+        void tryPlayVideo(el, `unlock-sound:${reason}`);
+      }
+      console.log(LOG, 'sound unlocked', { index, reason });
+      return true;
+    },
+    [],
+  );
+
+  const wantsSound = useCallback(
+    () => soundUnlockedRef.current && !isMuted,
+    [isMuted],
+  );
 
   const syncPlayOverlay = useCallback((index: number, reason: string) => {
     const el = videoRefs.current.get(index);
@@ -172,7 +203,7 @@ export function ReelsPlayer({
   const playVideo = useCallback(
     (index: number, opts?: { preferSound?: boolean }) => {
       const gen = ++playGenRef.current;
-      const preferSound = opts?.preferSound ?? (userGestureRef.current && !isMuted);
+      const preferSound = opts?.preferSound ?? wantsSound();
 
       userPausedRef.current = false;
       playBlockedRef.current = false;
@@ -191,11 +222,11 @@ export function ReelsPlayer({
         if (gen !== playGenRef.current) return;
 
         if (ok) {
-          const playedMuted = el.muted;
-          if (playedMuted && preferSound) {
-            setIsMuted(true);
-          } else if (!playedMuted && preferSound) {
+          if (!el.muted) {
             setIsMuted(false);
+            setShowSoundHint(false);
+          } else if (!soundUnlockedRef.current) {
+            setShowSoundHint(true);
           }
           playBlockedRef.current = false;
         } else if (el.paused) {
@@ -204,7 +235,7 @@ export function ReelsPlayer({
         syncPlayOverlay(index, `playVideo done ok=${ok}`);
       });
     },
-    [isMuted, syncPlayOverlay],
+    [wantsSound, syncPlayOverlay],
   );
 
   useEffect(() => {
@@ -237,7 +268,7 @@ export function ReelsPlayer({
       if (gen !== playGenRef.current || userPausedRef.current) return;
       if (!el.paused && el.currentTime > 0) return;
       void playWithFallback(el, `ready idx=${currentIndex}`, {
-        preferSound: userGestureRef.current && !isMuted,
+        preferSound: wantsSound(),
       }).then((ok) => {
         if (gen !== playGenRef.current) return;
         playBlockedRef.current = !ok && el.paused;
@@ -253,7 +284,29 @@ export function ReelsPlayer({
       el.removeEventListener('loadeddata', onReady);
       el.removeEventListener('canplay', onReady);
     };
-  }, [currentIndex, currentVideoId, isMuted, syncPlayOverlay, videos]);
+  }, [currentIndex, currentVideoId, wantsSound, syncPlayOverlay, videos]);
+
+  useEffect(() => {
+    if (!showSoundHint) return;
+    const t = window.setTimeout(() => setShowSoundHint(false), 4000);
+    return () => window.clearTimeout(t);
+  }, [showSoundHint]);
+
+  useEffect(() => {
+    const container = containerRef.current;
+    if (!container) return;
+
+    const onFirstTouch = () => {
+      unlockSound(currentIndex, 'touchstart');
+    };
+    container.addEventListener('touchstart', onFirstTouch, { once: true, passive: true });
+    container.addEventListener('click', onFirstTouch, { once: true });
+
+    return () => {
+      container.removeEventListener('touchstart', onFirstTouch);
+      container.removeEventListener('click', onFirstTouch);
+    };
+  }, [currentIndex, unlockSound]);
 
   useEffect(() => {
     for (const video of videoRefs.current.values()) {
@@ -263,6 +316,10 @@ export function ReelsPlayer({
 
   useEffect(() => {
     window.localStorage.setItem('reels:muted', isMuted ? '1' : '0');
+    if (!isMuted) {
+      window.localStorage.setItem('reels:soundUnlocked', '1');
+      soundUnlockedRef.current = true;
+    }
   }, [isMuted]);
 
   const handleScroll = () => {
@@ -271,8 +328,12 @@ export function ReelsPlayer({
     const index = Math.round(container.scrollTop / container.clientHeight);
     if (index !== currentIndex && index >= 0 && index < videos.length) {
       userGestureRef.current = true;
+      const unlocked = unlockSound(index, 'scroll');
       setCurrentIndex(index);
       onIndexChange?.(index);
+      if (unlocked) {
+        playVideo(index, { preferSound: true });
+      }
     }
   };
 
@@ -304,8 +365,11 @@ export function ReelsPlayer({
 
     if (!el.paused) {
       if (el.muted) {
+        soundUnlockedRef.current = true;
+        window.localStorage.setItem('reels:soundUnlocked', '1');
         el.muted = false;
         setIsMuted(false);
+        setShowSoundHint(false);
         void tryPlayVideo(el, 'tap-unmute');
         return;
       }
@@ -328,6 +392,8 @@ export function ReelsPlayer({
     }
 
     userGestureRef.current = true;
+    soundUnlockedRef.current = true;
+    window.localStorage.setItem('reels:soundUnlocked', '1');
     userPausedRef.current = false;
     playBlockedRef.current = false;
     setIsMuted(false);
@@ -467,6 +533,19 @@ export function ReelsPlayer({
               }}
             />
 
+            {index === currentIndex && showSoundHint && !showPlayBtn && (
+              <button
+                type="button"
+                className="absolute left-1/2 top-24 z-20 -translate-x-1/2 rounded-full bg-black/70 px-4 py-2 text-sm font-medium text-white backdrop-blur-sm"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  unlockSound(index, 'sound-hint');
+                }}
+              >
+                🔊 Барои садо пахш кунед
+              </button>
+            )}
+
             {index === currentIndex && showPlayBtn && (
               <button
                 type="button"
@@ -557,6 +636,10 @@ export function ReelsPlayer({
                   e.stopPropagation();
                   userGestureRef.current = true;
                   const nextMuted = !isMuted;
+                  if (!nextMuted) {
+                    soundUnlockedRef.current = true;
+                    window.localStorage.setItem('reels:soundUnlocked', '1');
+                  }
                   setIsMuted(nextMuted);
                   const el = videoRefs.current.get(currentIndex);
                   if (el) {
