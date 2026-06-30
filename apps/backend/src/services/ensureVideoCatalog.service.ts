@@ -50,6 +50,8 @@ export async function ensureVideoCatalog(minTotal = TARGET_TOTAL): Promise<void>
     return;
   }
 
-  console.warn('[catalog] no PEXELS_API_KEY — filling with GCS sample clips');
-  await ensureMinimumVideos(minTotal);
+  console.warn('[catalog] no PEXELS_API_KEY — filling with GCS sample clips (background)');
+  void ensureMinimumVideos(minTotal)
+    .then(() => console.log('[catalog] minseed done'))
+    .catch((err) => console.error('[catalog] minseed failed', err));
 }
