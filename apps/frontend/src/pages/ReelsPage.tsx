@@ -9,7 +9,7 @@ import { BottomNav } from '@/components/BottomNav';
 import { FeedSkeleton } from '@/components/Skeleton';
 import { videoMatchesCategories } from '@/utils/categoryFilter';
 
-const APP_VERSION = '5.3.0';
+const APP_VERSION = '5.3.1';
 
 export function ReelsPage() {
   useSocket();
@@ -67,14 +67,15 @@ export function ReelsPage() {
         format: 'reels',
         categories: feedCategories,
       });
-      const filtered = data.videos.filter((v) => videoMatchesCategories(v, feedCategories));
-      const sorted = [...filtered].sort(
-        (a, b) => Number(b.hasAudio) - Number(a.hasAudio),
-      );
-      setVideos(sorted);
+      const filtered = data.videos
+        .filter((v) => videoMatchesCategories(v, feedCategories))
+        .sort((a, b) => Number(b.hasAudio) - Number(a.hasAudio));
+      const withSound = filtered.filter((v) => v.hasAudio !== false);
+      const display = withSound.length > 0 ? withSound : filtered;
+      setVideos(display);
       setPagination(data.nextCursor, data.hasMore);
       setLoadError(null);
-      return { ...data, videos: sorted };
+      return { ...data, videos: display };
     },
     staleTime: 15_000,
     enabled: feedCategories.length > 0,

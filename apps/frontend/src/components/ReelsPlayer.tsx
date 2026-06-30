@@ -109,11 +109,24 @@ export function ReelsPlayer({
   const [showPlayBtn, setShowPlayBtn] = useState(false);
   const [showSoundHint, setShowSoundHint] = useState(false);
 
-  const { unlock: unlockSound } = useSoundUnlock();
   const storeIndex = useFeedStore((s) => s.currentIndex);
   const setStoreIndex = useFeedStore((s) => s.setCurrentIndex);
   const currentIndex = controlledIndex ?? storeIndex;
+  const currentIndexRef = useRef(currentIndex);
+  currentIndexRef.current = currentIndex;
   const setCurrentIndex = onIndexChange ?? setStoreIndex;
+
+  const { unlock: unlockSound } = useSoundUnlock(() => {
+    const idx = currentIndexRef.current;
+    const el = videoRefs.current.get(idx);
+    const v = videos[idx];
+    if (!el || !v || v.hasAudio === false) return;
+    isMutedRef.current = false;
+    setIsMuted(false);
+    setShowSoundHint(false);
+    applyAudio(el, false);
+    void tryPlayVideo(el, 'gesture-unlock');
+  });
 
   const [isMuted, setIsMuted] = useState(readMutedPref);
 
@@ -142,13 +155,20 @@ export function ReelsPlayer({
       setShowSoundHint(false);
 
       const el = videoRefs.current.get(index);
+      const v = videos[index];
       if (!el) return;
+
+      if (v?.hasAudio === false) {
+        applyAudio(el, true);
+        void tryPlayVideo(el, `silent:${reason}`);
+        return;
+      }
 
       applyAudio(el, false);
       void tryPlayVideo(el, `unmute:${reason}`);
       console.log(LOG, 'unmuted', { index, reason });
     },
-    [unlockSound],
+    [unlockSound, videos],
   );
 
   const muteCurrent = useCallback((index: number) => {
@@ -227,15 +247,17 @@ export function ReelsPlayer({
     setShowPlayBtn(false);
 
     const video = videos[currentIndex];
-    const wantSound =
-      video?.hasAudio !== false &&
-      isSoundUnlocked() &&
-      !readMutedPref();
+    const canHaveSound = video?.hasAudio !== false;
+    const wantSound = canHaveSound && isSoundUnlocked() && !readMutedPref();
 
     startPlayback(currentIndex, {
       withSound: wantSound,
       allowMutedFallback: true,
     });
+
+    if (canHaveSound && !wantSound && !userPausedRef.current) {
+      setShowSoundHint(true);
+    }
 
     if (!video) return;
 
@@ -433,6 +455,7 @@ export function ReelsPlayer({
               className="h-full w-full object-cover"
               loop
               playsInline
+              muted={index === currentIndex ? isMuted : true}
               preload={
                 index === currentIndex
                   ? 'auto'
