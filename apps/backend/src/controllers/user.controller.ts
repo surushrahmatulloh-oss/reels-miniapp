@@ -287,9 +287,14 @@ export async function searchVideos(req: AuthRequest, res: Response): Promise<voi
   }
 
   if (isFallbackMode()) {
-    res.json({ videos: fb.fallbackSearchVideos(q || categoryParam || '', req.user!.userId) });
+    res.json({
+      videos: fb.fallbackSearchVideos(q || categoryParam || '', req.user!.userId, categoryParam),
+    });
     return;
   }
+
+  const MP4_FILTER = { $not: { $regex: /youtube\.com\/embed|youtu\.be/i } };
+  const baseFilter = { format: 'reels', url: MP4_FILTER };
 
   const escaped = q.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
   const categoryId = categoryParam
@@ -310,21 +315,27 @@ export async function searchVideos(req: AuthRequest, res: Response): Promise<voi
       }
     : null;
 
+  const qIsCategoryOnly = Boolean(categoryId && (!q || q.toLowerCase() === categoryId || resolveCategoryQuery(q) === categoryId));
+
   let filter: Record<string, unknown>;
   if (categoryId) {
     const cats = expandCategoryIds([categoryId]);
     const catFilter = { category: { $in: cats } };
-    filter = textFilter ? { $and: [catFilter, textFilter] } : catFilter;
+    if (textFilter && !qIsCategoryOnly) {
+      filter = { $and: [baseFilter, catFilter, textFilter] };
+    } else {
+      filter = { $and: [baseFilter, catFilter] };
+    }
   } else if (formatFilter) {
-    filter = { format: formatFilter };
+    filter = { ...baseFilter, format: formatFilter };
   } else if (textFilter) {
-    filter = textFilter;
+    filter = { $and: [baseFilter, textFilter] };
   } else {
     res.json({ videos: [] });
     return;
   }
 
-  const videos = await Video.find(filter).sort({ _id: -1 }).limit(24).lean();
+  const videos = await Video.find(filter).sort({ _id: -1 }).limit(48).lean();
 
   const enriched = await enrichVideos(videos as unknown as import('../models/Video.js').IVideo[], req.user!.userId);
   res.json({ videos: enriched });

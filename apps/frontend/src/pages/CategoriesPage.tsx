@@ -16,9 +16,15 @@ export function CategoriesPage() {
   const setCurrentIndex = useFeedStore((s) => s.setCurrentIndex);
 
   const saved = user?.preferences.categories ?? [];
-  const [selected, setSelected] = useState<string[]>(() =>
-    saved.length > 0 ? saved : [],
-  );
+  const [selected, setSelected] = useState<string[]>(() => {
+    if (saved.length > 0) return saved;
+    try {
+      const raw = localStorage.getItem('reels:selectedCategories');
+      return raw ? (JSON.parse(raw) as string[]) : [];
+    } catch {
+      return [];
+    }
+  });
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState('');
 
@@ -43,6 +49,7 @@ export function CategoriesPage() {
         language: user?.preferences.language,
       });
       setUser(updated);
+      localStorage.setItem('reels:selectedCategories', JSON.stringify(selected));
 
       setActiveCategories(selected);
       setVideos([]);

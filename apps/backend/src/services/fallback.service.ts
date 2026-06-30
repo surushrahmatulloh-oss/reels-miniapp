@@ -184,6 +184,7 @@ function enrichVideo(v: MemoryVideo, userId: string) {
     url: useDirect ? v.url : publicVideoUrl(v.id),
     playUrl: useDirect ? v.url : publicVideoUrl(v.id),
     thumbnailUrl: v.thumbnailUrl || `https://picsum.photos/seed/reel${v.id}/720/1280`,
+    title: v.caption,
     format: v.format,
     category: v.category,
     hashtags: v.hashtags,
@@ -203,14 +204,19 @@ function enrichVideo(v: MemoryVideo, userId: string) {
   };
 }
 
-function matchesQuery(v: MemoryVideo, q: string): boolean {
-  const lower = q.toLowerCase();
-  const categoryId = resolveCategoryQuery(q);
+function matchesQuery(v: MemoryVideo, q: string, categoryParam?: string): boolean {
+  const categoryId = categoryParam
+    ? resolveCategoryQuery(categoryParam) ?? categoryParam
+    : resolveCategoryQuery(q);
+
   if (categoryId) {
     const cats = expandCategoryIds([categoryId]);
-    if (cats.includes(v.category)) return true;
+    if (cats.includes(v.category.toLowerCase())) return true;
     if (v.hashtags.some((h) => cats.includes(h.toLowerCase()))) return true;
+    if (!q || resolveCategoryQuery(q) === categoryId) return false;
   }
+
+  const lower = q.toLowerCase();
   if (isFormatQuery(q)) return v.format === q.toLowerCase();
   return (
     v.caption.toLowerCase().includes(lower) ||
@@ -381,10 +387,11 @@ export function fallbackSearchUsers(q: string) {
     }));
 }
 
-export function fallbackSearchVideos(q: string, userId?: string) {
+export function fallbackSearchVideos(q: string, userId?: string, categoryParam?: string) {
   return videos
-    .filter((v) => matchesQuery(v, q))
-    .slice(0, 24)
+    .filter((v) => matchesQuery(v, q, categoryParam))
+    .sort((a, b) => Number(urlHasAudio(b.url)) - Number(urlHasAudio(a.url)))
+    .slice(0, 48)
     .map((v) => enrichVideo(v, userId ?? 'guest'));
 }
 

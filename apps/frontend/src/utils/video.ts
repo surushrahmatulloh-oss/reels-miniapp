@@ -52,12 +52,20 @@ export function dedupeVideosById(videos: Video[]): Video[] {
 export function dedupeVideosByUrl(videos: Video[]): Video[] {
   const seenIds = new Set<string>();
   const seenUrls = new Set<string>();
-  return videos.filter((v) => {
-    if (seenIds.has(v.id)) return false;
+  const out: Video[] = [];
+
+  for (const v of videos) {
+    if (seenIds.has(v.id)) continue;
     const mediaUrl = getPlayableUrl(v);
-    if (seenUrls.has(mediaUrl)) return false;
+    if (seenUrls.has(mediaUrl)) continue;
+
+    const prev = out[out.length - 1];
+    if (prev && getPlayableUrl(prev) === mediaUrl) continue;
+
     seenIds.add(v.id);
     seenUrls.add(mediaUrl);
-    return true;
-  });
+    out.push(v);
+  }
+
+  return out;
 }

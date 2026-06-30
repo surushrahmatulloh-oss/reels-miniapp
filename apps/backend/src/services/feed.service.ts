@@ -16,6 +16,15 @@ const MP4_URL_FILTER = {
   $not: { $regex: /youtube\.com\/embed|youtu\.be/i },
 };
 
+function shuffleArray<T>(items: T[]): T[] {
+  const arr = [...items];
+  for (let i = arr.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1));
+    [arr[i], arr[j]] = [arr[j]!, arr[i]!];
+  }
+  return arr;
+}
+
 async function getWatchedIds(userId: string, limit = 300): Promise<Set<string>> {
   const views = await View.find({ userId })
     .sort({ createdAt: -1 })
@@ -95,7 +104,7 @@ export async function buildFeed(params: {
   const strictCategories = params.categories.length > 0;
   const catKey = [...params.categories].sort().join('|') || 'default';
   const excludeKey = (params.excludeIds ?? []).slice(0, 50).join(',');
-  const cacheKey = `feed:v7:${params.userId}:${format}:${catKey}:${params.cursor ?? 'start'}:${limit}:${excludeKey}`;
+  const cacheKey = `feed:v8:${params.userId}:${format}:${catKey}:${params.cursor ?? 'start'}:${limit}:${excludeKey}`;
   const cached = await cacheGet<{ videos: IVideo[]; nextCursor: string | null; hasMore: boolean }>(
     cacheKey,
   );
@@ -131,6 +140,7 @@ export async function buildFeed(params: {
   const categoryMatch = { ...baseMatch, category: { $in: preferredCategories } };
 
   let page: IVideo[] = [];
+  let isReplay = false;
 
   if (strictCategories) {
     const audioClips = await fetchCategoryAudioClips(preferredCategories, 5);
@@ -139,6 +149,7 @@ export async function buildFeed(params: {
     page = page.filter((v) => matchesCategories(v, preferredCategories));
 
     if (page.length === 0) {
+      isReplay = true;
       const replayMatch: Record<string, unknown> = {
         format,
         url: MP4_URL_FILTER,
@@ -160,6 +171,7 @@ export async function buildFeed(params: {
   }
 
   page = sortAudioFirst(page);
+  if (isReplay) page = shuffleArray(page);
 
   const hasMore = page.length > limit;
   page = page.slice(0, limit);

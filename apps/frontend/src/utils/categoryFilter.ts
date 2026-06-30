@@ -2,10 +2,10 @@
 const LEGACY_MAP: Record<string, string[]> = {
   cars: ['cars', 'automotive', 'business'],
   sport: ['sport', 'fitness', 'dance'],
-  football: ['football', 'sport', 'fitness'],
+  football: ['football'],
   music: ['music', 'dance'],
   cinema: ['cinema', 'entertainment', 'animation', 'art'],
-  tech: ['tech', 'technology', 'science'],
+  tech: ['tech', 'technology'],
   gaming: ['gaming', 'entertainment'],
   comedy: ['comedy', 'entertainment'],
   news: ['news', 'education'],

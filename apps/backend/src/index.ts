@@ -18,10 +18,11 @@ import adminRoutes from './routes/admin.routes.js';
 import { streamMedia } from './controllers/media.controller.js';
 import { setupSockets } from './sockets/index.js';
 import { ensureCategoryAudioClips } from './services/categoryAudioSeed.service.js';
+import { ensureMinimumVideos } from './services/ensureMinimumVideos.service.js';
 import { videos, isFallbackMode } from './store/fallback.js';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
-const APP_VERSION = '5.5.0';
+const APP_VERSION = '6.0.0';
 
 async function main() {
   const app = express();
@@ -109,6 +110,9 @@ async function main() {
     console.log('Database ready');
     await ensureCategoryAudioClips().catch((err) =>
       console.warn('[audio-seed] ensure failed:', err),
+    );
+    await ensureMinimumVideos(100).catch((err) =>
+      console.warn('[min-seed] ensure failed:', err),
     );
   });
   void connectRedis().catch(() => console.warn('Redis unavailable — running without cache'));
