@@ -26,7 +26,7 @@ export async function fetchVideosHandler(req: Request, res: Response): Promise<v
 
   const wipeAll = req.body?.wipeAll !== false;
   const targetTotal = Number(req.body?.targetTotal ?? 2322);
-  const perCategory = Number(req.body?.perCategory ?? Math.ceil(targetTotal / 18));
+  const perCategory = Number(req.body?.perCategory ?? Math.ceil(targetTotal / 12));
 
   seedRunning = true;
   lastSeedError = null;

@@ -9,7 +9,7 @@ import { BottomNav } from '@/components/BottomNav';
 import { FeedSkeleton } from '@/components/Skeleton';
 import { videoMatchesCategories } from '@/utils/categoryFilter';
 
-const APP_VERSION = '6.0.0';
+const APP_VERSION = '6.1.0';
 const CATEGORIES_STORAGE_KEY = 'reels:selectedCategories';
 
 export function ReelsPage() {
@@ -82,12 +82,10 @@ export function ReelsPage() {
       const filtered = data.videos
         .filter((v) => videoMatchesCategories(v, feedCategories))
         .sort((a, b) => Number(b.hasAudio) - Number(a.hasAudio));
-      const withSound = filtered.filter((v) => v.hasAudio !== false);
-      const display = withSound.length > 0 ? withSound : filtered;
-      setVideos(display);
+      setVideos(filtered);
       setPagination(data.nextCursor, data.hasMore);
       setLoadError(null);
-      return { ...data, videos: display };
+      return { ...data, videos: filtered };
     },
     staleTime: 15_000,
     enabled: feedCategories.length > 0,
@@ -113,10 +111,8 @@ export function ReelsPage() {
       const filtered = data.videos
         .filter((v) => videoMatchesCategories(v, feedCategories))
         .sort((a, b) => Number(b.hasAudio) - Number(a.hasAudio));
-      const withSound = filtered.filter((v) => v.hasAudio !== false);
-      const batch = withSound.length > 0 ? withSound : filtered;
-      if (batch.length > 0) {
-        setVideos(batch, true);
+      if (filtered.length > 0) {
+        setVideos(filtered, true);
         setPagination(data.nextCursor, data.hasMore);
       } else if (data.hasMore && data.nextCursor) {
         setPagination(data.nextCursor, true);

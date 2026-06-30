@@ -18,11 +18,11 @@ import adminRoutes from './routes/admin.routes.js';
 import { streamMedia } from './controllers/media.controller.js';
 import { setupSockets } from './sockets/index.js';
 import { ensureCategoryAudioClips } from './services/categoryAudioSeed.service.js';
-import { ensureMinimumVideos } from './services/ensureMinimumVideos.service.js';
+import { ensureVideoCatalog, countReelsVideos } from './services/ensureVideoCatalog.service.js';
 import { videos, isFallbackMode } from './store/fallback.js';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
-const APP_VERSION = '6.0.0';
+const APP_VERSION = '6.1.0';
 
 async function main() {
   const app = express();
@@ -30,12 +30,19 @@ async function main() {
   const server = http.createServer(app);
 
   // Lightweight health — no DB query (Render health check must be instant)
-  app.get('/health', (_req, res) => {
+  app.get('/health', async (_req, res) => {
+    let videoCount: number | null = null;
+    try {
+      videoCount = await countReelsVideos();
+    } catch {
+      videoCount = null;
+    }
     res.json({
       status: 'ok',
       version: APP_VERSION,
       mongo: isFallbackMode() ? 'fallback' : 'managed',
       fallback: isFallbackMode(),
+      videoCount,
       timestamp: new Date().toISOString(),
     });
   });
@@ -111,8 +118,8 @@ async function main() {
     await ensureCategoryAudioClips().catch((err) =>
       console.warn('[audio-seed] ensure failed:', err),
     );
-    await ensureMinimumVideos(100).catch((err) =>
-      console.warn('[min-seed] ensure failed:', err),
+    await ensureVideoCatalog(2000).catch((err) =>
+      console.warn('[catalog] ensure failed:', err),
     );
   });
   void connectRedis().catch(() => console.warn('Redis unavailable — running without cache'));

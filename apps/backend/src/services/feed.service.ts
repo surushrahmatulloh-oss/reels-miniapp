@@ -35,16 +35,12 @@ async function getWatchedIds(userId: string, limit = 300): Promise<Set<string>> 
 }
 
 function dedupeByUrl(videos: IVideo[], limit: number): IVideo[] {
-  const seenUrls = new Set<string>();
   const seenIds = new Set<string>();
   const out: IVideo[] = [];
   for (const v of videos) {
     const id = v._id.toString();
     if (seenIds.has(id)) continue;
-    const key = v.url?.trim() || id;
-    if (seenUrls.has(key)) continue;
     seenIds.add(id);
-    seenUrls.add(key);
     out.push(v);
     if (out.length >= limit) break;
   }

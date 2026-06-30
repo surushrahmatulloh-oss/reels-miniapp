@@ -5,5 +5,7 @@ export function isServerPlayableUrl(url: string): boolean {
 }
 
 export function normalizePlaybackUrl(storedUrl: string | null | undefined): string {
-  return storedUrl ?? '';
+  if (!storedUrl) return '';
+  const i = storedUrl.indexOf('#v=minseed_');
+  return i > 0 ? storedUrl.slice(0, i) : storedUrl;
 }

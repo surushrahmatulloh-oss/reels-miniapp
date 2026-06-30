@@ -15,7 +15,7 @@ const CAPTIONS = [
 ];
 
 /** Ensure at least `minCount` reels MP4 videos exist (with audio URLs when possible). */
-export async function ensureMinimumVideos(minCount = 100): Promise<void> {
+export async function ensureMinimumVideos(minCount = 2000): Promise<void> {
   if (!isDatabaseReady()) return;
 
   const existing = await Video.countDocuments({
@@ -29,8 +29,9 @@ export async function ensureMinimumVideos(minCount = 100): Promise<void> {
 
   while (existing + added < minCount) {
     const cat = APP_CATEGORIES[seq % APP_CATEGORIES.length]!;
-    const url = AUDIO_MP4_URLS[seq % AUDIO_MP4_URLS.length]!;
+    const baseUrl = AUDIO_MP4_URLS[seq % AUDIO_MP4_URLS.length]!;
     const instagramId = `minseed_${cat.id}_${seq}`;
+    const url = `${baseUrl.split('#')[0]}#v=${instagramId}`;
     seq++;
 
     const found = await Video.findOne({ instagramId }).lean();

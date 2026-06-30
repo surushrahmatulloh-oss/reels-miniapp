@@ -4,9 +4,14 @@ const API_URL = (import.meta.env.VITE_API_URL ?? '').replace(/\/$/, '');
 
 /** Prefer direct CDN URL (audio clips) over media proxy */
 export function getPlayableUrl(video: Pick<Video, 'id' | 'url'> & { playUrl?: string }): string {
-  if (video.url?.startsWith('http')) return video.url;
+  const stripCatalogHash = (url: string) => {
+    const i = url.indexOf('#v=minseed_');
+    return i > 0 ? url.slice(0, i) : url;
+  };
+
+  if (video.url?.startsWith('http')) return stripCatalogHash(video.url);
   const path = video.playUrl ?? `/api/media/${video.id}.mp4`;
-  if (path.startsWith('http')) return path;
+  if (path.startsWith('http')) return stripCatalogHash(path);
   return API_URL ? `${API_URL}${path}` : path;
 }
 
@@ -51,19 +56,11 @@ export function dedupeVideosById(videos: Video[]): Video[] {
 
 export function dedupeVideosByUrl(videos: Video[]): Video[] {
   const seenIds = new Set<string>();
-  const seenUrls = new Set<string>();
   const out: Video[] = [];
 
   for (const v of videos) {
     if (seenIds.has(v.id)) continue;
-    const mediaUrl = getPlayableUrl(v);
-    if (seenUrls.has(mediaUrl)) continue;
-
-    const prev = out[out.length - 1];
-    if (prev && getPlayableUrl(prev) === mediaUrl) continue;
-
     seenIds.add(v.id);
-    seenUrls.add(mediaUrl);
     out.push(v);
   }
 
