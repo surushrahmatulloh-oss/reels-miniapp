@@ -9,7 +9,7 @@ import { BottomNav } from '@/components/BottomNav';
 import { FeedSkeleton } from '@/components/Skeleton';
 import { videoMatchesCategories } from '@/utils/categoryFilter';
 
-const APP_VERSION = '5.3.1';
+const APP_VERSION = '5.3.2';
 
 export function ReelsPage() {
   useSocket();

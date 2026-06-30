@@ -146,27 +146,48 @@ export function ReelsPlayer({
     if (el) applyAudio(el, isMutedRef.current);
   }, []);
 
-  const unmuteCurrent = useCallback(
-    (index: number, reason: string) => {
-      playGenRef.current += 1;
-      unlockSound();
-      isMutedRef.current = false;
-      setIsMuted(false);
-      setShowSoundHint(false);
+  const syncPlayOverlay = useCallback((index: number) => {
+    const el = videoRefs.current.get(index);
+    if (!el || index !== currentIndex) return;
 
+    const isActuallyPlaying = !el.paused && !el.ended && el.readyState >= 2;
+    const shouldShow =
+      !isActuallyPlaying && (playBlockedRef.current || userPausedRef.current) && !el.ended;
+    setShowPlayBtn(shouldShow);
+  }, [currentIndex]);
+
+  const resumePlayback = useCallback(
+    async (index: number, reason: string) => {
       const el = videoRefs.current.get(index);
       const v = videos[index];
       if (!el) return;
 
-      if (v?.hasAudio === false) {
-        applyAudio(el, true);
-        void tryPlayVideo(el, `silent:${reason}`);
-        return;
+      const gen = ++playGenRef.current;
+      userPausedRef.current = false;
+      playBlockedRef.current = false;
+      unlockSound();
+
+      const trySound = v?.hasAudio !== false;
+      if (trySound && isSoundUnlocked()) {
+        isMutedRef.current = false;
+        setIsMuted(false);
       }
 
-      applyAudio(el, false);
-      void tryPlayVideo(el, `unmute:${reason}`);
-      console.log(LOG, 'unmuted', { index, reason });
+      const ok = await playVideoElement(el, reason, {
+        withSound: trySound && isSoundUnlocked(),
+        allowMutedFallback: true,
+      });
+
+      if (gen !== playGenRef.current) return;
+
+      if (ok) {
+        setShowPlayBtn(false);
+        setShowSoundHint(el.muted && trySound);
+        playBlockedRef.current = false;
+      } else {
+        playBlockedRef.current = true;
+        setShowPlayBtn(true);
+      }
     },
     [unlockSound, videos],
   );
@@ -177,16 +198,6 @@ export function ReelsPlayer({
     const el = videoRefs.current.get(index);
     if (el) applyAudio(el, true);
   }, []);
-
-  const syncPlayOverlay = useCallback((index: number) => {
-    const el = videoRefs.current.get(index);
-    if (!el || index !== currentIndex) return;
-
-    const isActuallyPlaying = !el.paused && !el.ended && el.readyState >= 2;
-    const shouldShow =
-      !isActuallyPlaying && (playBlockedRef.current || userPausedRef.current) && !el.ended;
-    setShowPlayBtn(shouldShow);
-  }, [currentIndex]);
 
   useEffect(() => {
     if (startIndex > 0) {
@@ -329,40 +340,21 @@ export function ReelsPlayer({
 
     if (!el.paused) {
       if (el.muted || isMutedRef.current) {
-        unmuteCurrent(index, 'tap');
+        void resumePlayback(index, 'tap-unmute');
         return;
       }
       userPausedRef.current = true;
       el.pause();
-      syncPlayOverlay(index);
+      setShowPlayBtn(true);
       return;
     }
 
-    userPausedRef.current = false;
-    playBlockedRef.current = false;
-    unmuteCurrent(index, 'tap-play');
-    void playVideoElement(el, 'tap-resume', { withSound: true, allowMutedFallback: false });
-  };
-
-  const handlePlayButton = async (index: number) => {
-    const el = videoRefs.current.get(index);
-    if (!el) return;
-
-    unmuteCurrent(index, 'play-btn');
-    userPausedRef.current = false;
-    playBlockedRef.current = false;
-
-    const ok = await playVideoElement(el, `play-btn idx=${index}`, {
-      withSound: true,
-      allowMutedFallback: false,
-    });
-    playBlockedRef.current = !ok && el.paused;
-    syncPlayOverlay(index);
+    void resumePlayback(index, 'tap-resume');
   };
 
   const handleToggleMute = (index: number) => {
     if (isMutedRef.current) {
-      unmuteCurrent(index, 'mute-btn');
+      void resumePlayback(index, 'mute-btn');
     } else {
       muteCurrent(index);
     }
@@ -513,7 +505,7 @@ export function ReelsPlayer({
                 className="absolute left-1/2 top-24 z-20 -translate-x-1/2 rounded-full bg-black/70 px-4 py-2 text-sm font-medium text-white backdrop-blur-sm"
                 onClick={(e) => {
                   e.stopPropagation();
-                  unmuteCurrent(index, 'hint');
+                  void resumePlayback(index, 'hint');
                 }}
               >
                 🔊 Барои садо пахш кунед
@@ -527,7 +519,7 @@ export function ReelsPlayer({
                 className="absolute inset-0 z-20 flex items-center justify-center bg-black/25"
                 onClick={(e) => {
                   e.stopPropagation();
-                  void handlePlayButton(index);
+                  void resumePlayback(index, 'play-overlay');
                 }}
               >
                 <span className="flex h-20 w-20 items-center justify-center rounded-full bg-black/55 text-4xl text-white shadow-lg backdrop-blur-sm">
