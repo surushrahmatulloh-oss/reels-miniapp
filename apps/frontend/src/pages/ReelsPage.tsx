@@ -9,7 +9,7 @@ import { BottomNav } from '@/components/BottomNav';
 import { FeedSkeleton } from '@/components/Skeleton';
 import { videoMatchesCategories } from '@/utils/categoryFilter';
 
-const APP_VERSION = '6.1.0';
+const APP_VERSION = '6.1.1';
 const CATEGORIES_STORAGE_KEY = 'reels:selectedCategories';
 
 export function ReelsPage() {

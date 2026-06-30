@@ -22,7 +22,7 @@ import { ensureVideoCatalog, countReelsVideos } from './services/ensureVideoCata
 import { videos, isFallbackMode } from './store/fallback.js';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
-const APP_VERSION = '6.1.0';
+const APP_VERSION = '6.1.1';
 
 async function main() {
   const app = express();

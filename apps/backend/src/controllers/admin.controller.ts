@@ -2,8 +2,11 @@ import type { Request, Response } from 'express';
 import { isFallbackMode } from '../store/fallback.js';
 
 let seedRunning = false;
+let catalogRunning = false;
 let lastSeedResult: Record<string, unknown> | null = null;
+let lastCatalogResult: Record<string, unknown> | null = null;
 let lastSeedError: string | null = null;
+let lastCatalogError: string | null = null;
 
 export async function fetchVideosHandler(req: Request, res: Response): Promise<void> {
   if (isFallbackMode()) {
@@ -57,8 +60,48 @@ export async function fetchVideosHandler(req: Request, res: Response): Promise<v
 
 export function seedStatusHandler(_req: Request, res: Response): void {
   res.json({
-    running: seedRunning,
+    running: seedRunning || catalogRunning,
+    seedRunning,
+    catalogRunning,
     lastResult: lastSeedResult,
-    lastError: lastSeedError,
+    lastCatalogResult,
+    lastError: lastSeedError ?? lastCatalogError,
   });
+}
+
+export async function fillCatalogHandler(req: Request, res: Response): Promise<void> {
+  if (isFallbackMode()) {
+    res.status(400).json({ error: 'MongoDB required' });
+    return;
+  }
+
+  if (catalogRunning || seedRunning) {
+    res.status(202).json({ ok: true, running: true, message: 'Seed already running' });
+    return;
+  }
+
+  const targetTotal = Number(req.body?.targetTotal ?? 2000);
+  catalogRunning = true;
+  lastCatalogError = null;
+
+  res.status(202).json({
+    ok: true,
+    running: true,
+    targetTotal,
+    message: `Catalog fill started — target ${targetTotal}`,
+  });
+
+  const { ensureMinimumVideos } = await import('../services/ensureMinimumVideos.service.js');
+  void ensureMinimumVideos(targetTotal)
+    .then((result) => {
+      lastCatalogResult = result;
+      console.log('[catalog-fill] done', result);
+    })
+    .catch((err: Error) => {
+      lastCatalogError = err.message;
+      console.error('[catalog-fill] failed', err);
+    })
+    .finally(() => {
+      catalogRunning = false;
+    });
 }
