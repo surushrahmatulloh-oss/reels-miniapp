@@ -10,7 +10,7 @@ RUN pnpm install --frozen-lockfile
 
 COPY . .
 # Cache bust — forces full rebuild (same as Clear build cache on Render)
-ARG CACHEBUST=20260630-v520
+ARG CACHEBUST=20260630-v530
 RUN echo "build ${CACHEBUST}"
 ENV VITE_API_URL=
 ENV VITE_WS_URL=

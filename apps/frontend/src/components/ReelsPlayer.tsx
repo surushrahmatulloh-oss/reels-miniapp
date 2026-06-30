@@ -10,7 +10,7 @@ import {
   markVideoViewed,
 } from '@/api/client';
 import { useFeedStore } from '@/store';
-import { useSoundUnlock, isSoundUnlocked } from '@/hooks/useSoundUnlock';
+import { useSoundUnlock, isSoundUnlocked } from '@/hooks';
 import { CommentsSheet } from './CommentsSheet';
 import {
   IconHeart,
@@ -118,6 +118,7 @@ export function ReelsPlayer({
   const [isMuted, setIsMuted] = useState(readMutedPref);
 
   const updateVideo = useFeedStore((s) => s.updateVideo);
+  const viewedIdsRef = useRef<Set<string>>(new Set());
   const recoverAttemptsRef = useRef<Map<number, number>>(new Map());
   const scrollRafRef = useRef(0);
   const currentVideoId = videos[currentIndex]?.id;
@@ -227,30 +228,33 @@ export function ReelsPlayer({
 
     const video = videos[currentIndex];
     const wantSound =
-      video?.hasAudio !== false && (isSoundUnlocked() || !isMutedRef.current);
-
-    if (wantSound && isMutedRef.current) {
-      isMutedRef.current = false;
-      setIsMuted(false);
-    }
+      video?.hasAudio !== false &&
+      isSoundUnlocked() &&
+      !readMutedPref();
 
     startPlayback(currentIndex, {
       withSound: wantSound,
-      allowMutedFallback: !wantSound,
+      allowMutedFallback: true,
     });
 
     if (!video) return;
 
-    const timer = window.setTimeout(() => {
-      void markVideoViewed(video.id);
-    }, 2000);
+    let timer: ReturnType<typeof window.setTimeout> | undefined;
+    if (!viewedIdsRef.current.has(video.id)) {
+      timer = window.setTimeout(() => {
+        viewedIdsRef.current.add(video.id);
+        void markVideoViewed(video.id);
+      }, 2000);
+    }
 
     if (currentIndex >= videos.length - 3 && onLoadMore) {
       onLoadMore();
     }
 
-    return () => window.clearTimeout(timer);
-  }, [currentIndex, currentVideoId, startPlayback, onLoadMore]);
+    return () => {
+      if (timer) window.clearTimeout(timer);
+    };
+  }, [currentIndex, currentVideoId, videos.length, startPlayback, onLoadMore]);
 
   useEffect(() => {
     if (!showSoundHint) return;
@@ -367,7 +371,12 @@ export function ReelsPlayer({
     const { shareUrl } = await shareVideo(video.id);
     const tg = window.Telegram?.WebApp;
     if (tg) {
-      tg.openTelegramLink(`https://t.me/share/url?url=${encodeURIComponent(shareUrl)}`);
+      const shareTg = `https://t.me/share/url?url=${encodeURIComponent(shareUrl)}`;
+      if (tg.openTelegramLink) {
+        tg.openTelegramLink(shareTg);
+      } else {
+        tg.openLink?.(shareUrl);
+      }
     } else if (navigator.share) {
       await navigator.share({ url: shareUrl, title: video.caption });
     } else {

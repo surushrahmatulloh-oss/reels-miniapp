@@ -3,11 +3,19 @@ import type { Video } from '@/types';
 import { getPlayableUrl } from '@/utils/video';
 
 const CATEGORY_GRADIENT: Record<string, string> = {
-  music: 'from-violet-900 via-fuchsia-800 to-pink-600',
+  cars: 'from-zinc-900 via-stone-700 to-amber-600',
   sport: 'from-emerald-900 via-green-700 to-lime-500',
+  football: 'from-green-900 via-emerald-700 to-lime-500',
+  music: 'from-violet-900 via-fuchsia-800 to-pink-600',
+  cinema: 'from-purple-900 via-violet-700 to-indigo-500',
+  tech: 'from-slate-900 via-blue-800 to-cyan-600',
+  gaming: 'from-indigo-900 via-purple-800 to-violet-600',
+  comedy: 'from-orange-900 via-amber-700 to-yellow-500',
+  news: 'from-gray-900 via-slate-700 to-blue-600',
   nature: 'from-teal-900 via-green-800 to-emerald-500',
-  food: 'from-orange-900 via-amber-700 to-yellow-500',
   travel: 'from-blue-900 via-indigo-700 to-cyan-500',
+  cooking: 'from-orange-900 via-red-800 to-amber-500',
+  food: 'from-orange-900 via-amber-700 to-yellow-500',
   fashion: 'from-rose-900 via-pink-700 to-fuchsia-500',
   technology: 'from-slate-900 via-blue-800 to-cyan-600',
   animation: 'from-purple-900 via-violet-700 to-indigo-500',

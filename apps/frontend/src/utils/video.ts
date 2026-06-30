@@ -10,17 +10,19 @@ export function getPlayableUrl(video: Pick<Video, 'id' | 'url'> & { playUrl?: st
   return API_URL ? `${API_URL}${path}` : path;
 }
 
-export function toVideo(partial: Partial<Video> & { id: string; playUrl?: string }): Video {
-  const playUrl = partial.playUrl ?? `/api/media/${partial.id}.mp4`;
+export function toVideo(partial: Partial<Video> & { id: string; playUrl?: string; url?: string }): Video {
+  const directUrl = partial.url?.startsWith('http') ? partial.url : undefined;
+  const playUrl = partial.playUrl ?? (directUrl ? directUrl : `/api/media/${partial.id}.mp4`);
+  const url = directUrl ?? playUrl;
   return {
     id: partial.id,
     instagramId: partial.instagramId ?? partial.id,
-    url: playUrl,
+    url,
     playUrl,
     thumbnailUrl: partial.thumbnailUrl ?? `https://picsum.photos/seed/reel${partial.id}/720/1280`,
     title: partial.title ?? partial.caption ?? '',
     format: partial.format ?? 'reels',
-    category: partial.category ?? 'entertainment',
+    category: partial.category ?? 'music',
     hashtags: partial.hashtags ?? [],
     caption: partial.caption ?? '',
     authorName: partial.authorName ?? '@user',
@@ -52,7 +54,7 @@ export function dedupeVideosByUrl(videos: Video[]): Video[] {
   const seenUrls = new Set<string>();
   return videos.filter((v) => {
     if (seenIds.has(v.id)) return false;
-    const mediaUrl = v.id;
+    const mediaUrl = getPlayableUrl(v);
     if (seenUrls.has(mediaUrl)) return false;
     seenIds.add(v.id);
     seenUrls.add(mediaUrl);

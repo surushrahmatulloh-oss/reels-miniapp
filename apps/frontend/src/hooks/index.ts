@@ -1,9 +1,10 @@
 import { useEffect, useRef, useState } from 'react';
 import { io, type Socket } from 'socket.io-client';
-import { useAuthStore } from '@/store';
-import { useFeedStore } from '@/store';
+import { useAuthStore, useFeedStore } from '@/store';
 
 const WS_URL = import.meta.env.VITE_WS_URL ?? window.location.origin;
+
+export { useSoundUnlock, isSoundUnlocked } from './useSoundUnlock';
 
 export function useTimedOut(active: boolean, ms: number): boolean {
   const [timedOut, setTimedOut] = useState(false);
@@ -24,7 +25,11 @@ export function useSocket() {
   const socketRef = useRef<Socket | null>(null);
   const token = useAuthStore((s) => s.token);
   const user = useAuthStore((s) => s.user);
+  const activeCategories = useFeedStore((s) => s.activeCategories);
   const updateVideo = useFeedStore((s) => s.updateVideo);
+
+  const categories =
+    activeCategories?.length ? activeCategories : user?.preferences.categories ?? [];
 
   useEffect(() => {
     if (!token || !user) return;
@@ -38,7 +43,7 @@ export function useSocket() {
 
     socket.emit('join_feed', {
       userId: user.id,
-      categories: user.preferences.categories,
+      categories,
     });
 
     socket.on('like_update', ({ videoId, likeCount }: { videoId: string; likeCount: number }) => {
@@ -61,7 +66,7 @@ export function useSocket() {
       socket.emit('leave_feed', { userId: user.id });
       socket.disconnect();
     };
-  }, [token, user, updateVideo]);
+  }, [token, user, categories.join(','), updateVideo]);
 
   return socketRef;
 }
@@ -72,7 +77,6 @@ export function useTelegram() {
   useEffect(() => {
     webApp?.ready();
     webApp?.expand();
-    webApp?.enableClosingConfirmation();
   }, [webApp]);
 
   const initData = webApp?.initData ?? '';

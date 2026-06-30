@@ -9,7 +9,7 @@ import { BottomNav } from '@/components/BottomNav';
 import { FeedSkeleton } from '@/components/Skeleton';
 import { videoMatchesCategories } from '@/utils/categoryFilter';
 
-const APP_VERSION = '5.2.0';
+const APP_VERSION = '5.3.0';
 
 export function ReelsPage() {
   useSocket();
@@ -37,12 +37,9 @@ export function ReelsPage() {
     const prev = localStorage.getItem('reels_app_version');
     if (prev !== APP_VERSION) {
       localStorage.setItem('reels_app_version', APP_VERSION);
-      localStorage.removeItem('reels:muted');
-      sessionStorage.removeItem('reels:soundUnlocked');
       useFeedStore.getState().setVideos([]);
       useFeedStore.getState().setCurrentIndex(0);
       useFeedStore.getState().setPagination(null, true);
-      useFeedStore.getState().setActiveCategories(null);
       void queryClient.invalidateQueries({ queryKey: ['feed'] });
     }
   }, [queryClient]);
@@ -60,8 +57,7 @@ export function ReelsPage() {
     setVideos([]);
     setCurrentIndex(0);
     setPagination(null, true);
-    void queryClient.invalidateQueries({ queryKey: ['feed'] });
-  }, [feedKeyStr, setVideos, setCurrentIndex, setPagination, queryClient]);
+  }, [feedKeyStr, setVideos, setCurrentIndex, setPagination]);
 
   const { isLoading, isError, refetch, isFetching } = useQuery({
     queryKey: feedKey,
@@ -71,24 +67,21 @@ export function ReelsPage() {
         format: 'reels',
         categories: feedCategories,
       });
-      const filtered = data.videos.filter(
-        (v) => videoMatchesCategories(v, feedCategories) && v.hasAudio !== false,
+      const filtered = data.videos.filter((v) => videoMatchesCategories(v, feedCategories));
+      const sorted = [...filtered].sort(
+        (a, b) => Number(b.hasAudio) - Number(a.hasAudio),
       );
-      setVideos(filtered);
+      setVideos(sorted);
       setPagination(data.nextCursor, data.hasMore);
       setLoadError(null);
-      return { ...data, videos: filtered };
+      return { ...data, videos: sorted };
     },
-    staleTime: 10_000,
-    refetchOnMount: 'always',
+    staleTime: 15_000,
     enabled: feedCategories.length > 0,
   });
 
   const displayVideos = useMemo(
-    () =>
-      videos.filter(
-        (v) => videoMatchesCategories(v, feedCategories) && v.hasAudio !== false,
-      ),
+    () => videos.filter((v) => videoMatchesCategories(v, feedCategories)),
     [videos, feedCategories],
   );
 
@@ -104,12 +97,12 @@ export function ReelsPage() {
         categories: feedCategories,
         excludeIds: loadedIds,
       });
-      const filtered = data.videos.filter(
-        (v) => videoMatchesCategories(v, feedCategories) && v.hasAudio !== false,
-      );
+      const filtered = data.videos.filter((v) => videoMatchesCategories(v, feedCategories));
       if (filtered.length > 0) {
         setVideos(filtered, true);
         setPagination(data.nextCursor, data.hasMore);
+      } else if (data.hasMore && data.nextCursor) {
+        setPagination(data.nextCursor, true);
       } else {
         setPagination(null, false);
       }

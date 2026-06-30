@@ -177,10 +177,12 @@ function publicVideoUrl(videoId: string): string {
 }
 
 function enrichVideo(v: MemoryVideo, userId: string) {
+  const useDirect = v.url.startsWith('http');
   return {
     id: v.id,
     instagramId: v.instagramId,
-    url: publicVideoUrl(v.id),
+    url: useDirect ? v.url : publicVideoUrl(v.id),
+    playUrl: useDirect ? v.url : publicVideoUrl(v.id),
     thumbnailUrl: v.thumbnailUrl || `https://picsum.photos/seed/reel${v.id}/720/1280`,
     format: v.format,
     category: v.category,
@@ -252,12 +254,7 @@ export function fallbackGetFeed(
 
   if (preferred.length > 0) {
     const expanded = expandCategoryIds(preferred);
-    page = page.filter(
-      (v) =>
-        expanded.includes(v.category.toLowerCase()) && urlHasAudio(v.url),
-    );
-  } else {
-    page = page.filter((v) => urlHasAudio(v.url));
+    page = page.filter((v) => expanded.includes(v.category.toLowerCase()));
   }
 
   const sorted = [...page].sort(
@@ -267,8 +264,8 @@ export function fallbackGetFeed(
 
   return {
     videos: enriched,
-    nextCursor: page.length > 0 ? page[page.length - 1]!.id : null,
-    hasMore: start + limit < unseenIds.length,
+    nextCursor: sorted.length > 0 ? sorted[sorted.length - 1]!.id : null,
+    hasMore: start + limit < unseenIds.length || sorted.length >= limit,
   };
 }
 

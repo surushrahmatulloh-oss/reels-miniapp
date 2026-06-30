@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { CATEGORIES, FORMATS } from '@/types';
+import { CATEGORIES } from '@/types';
 import { useOnboardingStore, useAuthStore } from '@/store';
 import { completeOnboarding } from '@/api/client';
 import { useTelegram } from '@/hooks';
@@ -9,19 +9,17 @@ const STEPS = ['Категорияҳо', 'Профил', 'Оғоз'];
 
 export function OnboardingPage() {
   const navigate = useNavigate();
-  const { tgUser, isTelegram } = useTelegram();
+  const { tgUser } = useTelegram();
   const setUser = useAuthStore((s) => s.setUser);
   const {
     step,
     username,
     bio,
     avatarUrl,
-    formats,
     categories,
     setStep,
     setField,
     toggleCategory,
-    toggleFormat,
   } = useOnboardingStore();
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
@@ -43,7 +41,7 @@ export function OnboardingPage() {
         username: username || tgUser?.username,
         bio,
         avatarUrl: displayAvatar,
-        formats: formats.length ? (formats as ('reels' | 'igtv' | 'stories')[]) : ['reels'],
+        formats: ['reels'],
         categories,
       });
       setUser(user);
@@ -55,18 +53,25 @@ export function OnboardingPage() {
     }
   };
 
+  const continueStep0 = () => {
+    if (categories.length < 1) {
+      setError('Ҳадди ақал 1 категория интихоб кунед');
+      return;
+    }
+    setError('');
+    next();
+  };
+
   return (
     <div className="flex h-full flex-col bg-black px-6 py-8 text-white">
-      {step > 0 && (
-        <div className="mb-6 flex gap-1.5">
-          {STEPS.map((_, i) => (
-            <div
-              key={i}
-              className={`h-0.5 flex-1 rounded-full ${i <= step ? 'bg-ig-accent' : 'bg-ig-border'}`}
-            />
-          ))}
-        </div>
-      )}
+      <div className="mb-6 flex gap-1.5">
+        {STEPS.map((_, i) => (
+          <div
+            key={i}
+            className={`h-0.5 flex-1 rounded-full ${i <= step ? 'bg-ig-accent' : 'bg-ig-border'}`}
+          />
+        ))}
+      </div>
 
       {step === 0 && (
         <>
@@ -150,8 +155,8 @@ export function OnboardingPage() {
 
       {error && <p className="mb-2 text-sm text-ig-accent">{error}</p>}
 
-      {step > 0 && (
-        <div className="mt-4 flex gap-3">
+      <div className="mt-4 flex gap-3">
+        {step > 0 && (
           <button
             type="button"
             onClick={back}
@@ -159,33 +164,38 @@ export function OnboardingPage() {
           >
             Бозгашт
           </button>
-          {step < STEPS.length - 1 ? (
-            <button
-              type="button"
-              onClick={() => {
-                if (step === 0 && categories.length < 1) {
-                  setError('Ҳадди ақал 1 категория интихоб кунед');
-                  return;
-                }
-                setError('');
-                next();
-              }}
-              className="flex-1 rounded-xl bg-ig-accent py-3 text-sm font-semibold text-white"
-            >
-              Идома
-            </button>
-          ) : (
-            <button
-              type="button"
-              onClick={() => void finish()}
-              disabled={loading || categories.length < 1}
-              className="flex-1 rounded-xl bg-ig-accent py-3 text-sm font-semibold text-white disabled:opacity-50"
-            >
-              {loading ? 'Сабр кунед...' : 'Оғоз кардан'}
-            </button>
-          )}
-        </div>
-      )}
+        )}
+        {step === 0 ? (
+          <button
+            type="button"
+            onClick={continueStep0}
+            disabled={categories.length < 1}
+            className="flex-1 rounded-xl bg-ig-accent py-3 text-sm font-semibold text-white disabled:opacity-50"
+          >
+            ➡ Идома
+          </button>
+        ) : step < STEPS.length - 1 ? (
+          <button
+            type="button"
+            onClick={() => {
+              setError('');
+              next();
+            }}
+            className="flex-1 rounded-xl bg-ig-accent py-3 text-sm font-semibold text-white"
+          >
+            Идома
+          </button>
+        ) : (
+          <button
+            type="button"
+            onClick={() => void finish()}
+            disabled={loading || categories.length < 1}
+            className="flex-1 rounded-xl bg-ig-accent py-3 text-sm font-semibold text-white disabled:opacity-50"
+          >
+            {loading ? 'Сабр кунед...' : 'Оғоз кардан'}
+          </button>
+        )}
+      </div>
     </div>
   );
 }

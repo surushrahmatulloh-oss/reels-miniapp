@@ -27,7 +27,7 @@ function renderText(text: string) {
 function timeAgo(date: string) {
   const diff = Date.now() - new Date(date).getTime();
   const mins = Math.floor(diff / 60000);
-  if (mins < 60) return `${mins || 1}d`;
+  if (mins < 60) return `${mins || 1} дақ`;
   const hrs = Math.floor(mins / 60);
   if (hrs < 24) return `${hrs}соат`;
   return `${Math.floor(hrs / 24)}р`;

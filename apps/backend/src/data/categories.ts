@@ -100,9 +100,10 @@ export function resolveCategoryQuery(q: string): string | null {
 export function expandCategoryIds(ids: string[]): string[] {
   const out = new Set<string>();
   for (const id of ids) {
-    const mapped = LEGACY_MAP[id] ?? [id];
-    for (const m of mapped) out.add(m);
-    out.add(id);
+    const key = id.toLowerCase();
+    const mapped = LEGACY_MAP[key] ?? LEGACY_MAP[id] ?? [key];
+    for (const m of mapped) out.add(m.toLowerCase());
+    out.add(key);
   }
   return [...out];
 }

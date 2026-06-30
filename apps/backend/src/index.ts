@@ -21,7 +21,7 @@ import { ensureCategoryAudioClips } from './services/categoryAudioSeed.service.j
 import { videos, isFallbackMode } from './store/fallback.js';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
-const APP_VERSION = '5.2.0';
+const APP_VERSION = '5.3.0';
 
 async function main() {
   const app = express();

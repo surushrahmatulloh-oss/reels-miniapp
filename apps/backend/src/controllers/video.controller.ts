@@ -47,7 +47,8 @@ export async function likeVideo(req: AuthRequest, res: Response): Promise<void> 
 
   const existing = await Like.findOne({ userId: req.user!.userId, videoId });
   if (existing) {
-    res.json({ liked: true });
+    const video = await Video.findById(videoId).select('likes').lean();
+    res.json({ liked: true, likeCount: video?.likes ?? 0 });
     return;
   }
 
@@ -84,7 +85,8 @@ export async function unlikeVideo(req: AuthRequest, res: Response): Promise<void
     res.json({ liked: false, likeCount: video?.likes ?? 0 });
     return;
   }
-  res.json({ liked: false });
+  const video = await Video.findById(videoId).select('likes').lean();
+  res.json({ liked: false, likeCount: video?.likes ?? 0 });
 }
 
 export async function saveVideo(req: AuthRequest, res: Response): Promise<void> {

@@ -21,10 +21,10 @@ import type { Video } from '@/types';
 type Tab = 'grid' | 'saved' | 'settings';
 
 const HIGHLIGHTS = [
-  { id: 'music', label: '🎵 Music', color: 'from-pink-500 to-orange-400' },
-  { id: 'travel', label: '✈️ Travel', color: 'from-blue-500 to-cyan-400' },
-  { id: 'food', label: '🍳 Food', color: 'from-yellow-500 to-red-400' },
-  { id: 'sport', label: '⚽ Sport', color: 'from-green-500 to-emerald-400' },
+  { id: 'music', label: '🎵 Мусиқӣ', color: 'from-pink-500 to-orange-400' },
+  { id: 'travel', label: '✈️ Сафар', color: 'from-blue-500 to-cyan-400' },
+  { id: 'cooking', label: '👨‍🍳 Ошпазӣ', color: 'from-yellow-500 to-red-400' },
+  { id: 'football', label: '⚽ Футбол', color: 'from-green-500 to-emerald-400' },
 ];
 
 export function ProfilePage() {

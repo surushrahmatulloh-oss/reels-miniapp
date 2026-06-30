@@ -53,7 +53,7 @@ export const comments = new Map<string, Array<{
 }>>();
 
 const CATEGORIES = [
-  'music', 'sport', 'nature', 'food', 'travel', 'fashion',
+  'music', 'sport', 'football', 'nature', 'food', 'travel', 'fashion',
   'technology', 'animation', 'entertainment', 'education', 'business', 'science',
 ] as const;
 
