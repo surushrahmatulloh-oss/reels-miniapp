@@ -51,15 +51,12 @@ export function ReelsPlayer({
   const containerRef = useRef<HTMLDivElement>(null);
   const videoRefs = useRef<Map<number, HTMLVideoElement>>(new Map());
   const lastTapRef = useRef(0);
-  const userPausedRef = useRef(false);
   const playTokenRef = useRef(0);
   const isMutedRef = useRef(true);
   const suppressTapUntilRef = useRef(0);
 
   const [heartAnim, setHeartAnim] = useState<{ x: number; y: number } | null>(null);
   const [commentsOpen, setCommentsOpen] = useState(false);
-  const [showPlayBtn, setShowPlayBtn] = useState(false);
-  const showPlayBtnRef = useRef(false);
   const [showSoundHint, setShowSoundHint] = useState(false);
   const [isMuted, setIsMuted] = useState(true);
 
@@ -76,11 +73,6 @@ export function ReelsPlayer({
   const currentVideoId = videos[currentIndex]?.id;
 
   const { unlock: unlockSound } = useSoundUnlock();
-
-  const setPlayBtnVisible = useCallback((visible: boolean) => {
-    showPlayBtnRef.current = visible;
-    setShowPlayBtn(visible);
-  }, []);
 
   const suppressParentTap = useCallback(() => {
     suppressTapUntilRef.current = Date.now() + 450;
@@ -106,7 +98,6 @@ export function ReelsPlayer({
       if (userGesture) {
         unlockSound();
         unlockSoundGlobal();
-        userPausedRef.current = false;
         suppressParentTap();
       }
 
@@ -145,16 +136,11 @@ export function ReelsPlayer({
 
       if (token !== playTokenRef.current) return false;
 
-      if (ok) {
-        setPlayBtnVisible(false);
-        if (!el.muted) setShowSoundHint(false);
-      } else {
-        setPlayBtnVisible(true);
-      }
+      if (ok && !el.muted) setShowSoundHint(false);
 
       return ok;
     },
-    [videos, unlockSound, suppressParentTap, setPlayBtnVisible],
+    [videos, unlockSound, suppressParentTap],
   );
 
   const schedulePlay = useCallback(
@@ -171,7 +157,7 @@ export function ReelsPlayer({
       if (el) {
         videoRefs.current.set(index, el);
         applyAudio(el, index !== currentIndexRef.current || isMutedRef.current);
-        if (index === currentIndexRef.current && !userPausedRef.current) {
+        if (index === currentIndexRef.current) {
           schedulePlay(index, false);
         }
       } else {
@@ -192,8 +178,6 @@ export function ReelsPlayer({
   const currentVideo = videos[currentIndex];
 
   useEffect(() => {
-    userPausedRef.current = false;
-    setPlayBtnVisible(false);
     schedulePlay(currentIndex, false);
 
     const video = videos[currentIndex];
@@ -218,7 +202,7 @@ export function ReelsPlayer({
     return () => {
       if (timer) window.clearTimeout(timer);
     };
-  }, [currentIndex, currentVideoId, schedulePlay, onLoadMore, videos.length, setPlayBtnVisible]);
+  }, [currentIndex, currentVideoId, schedulePlay, onLoadMore, videos.length]);
 
   useEffect(() => {
     if (!showSoundHint) return;
@@ -262,30 +246,7 @@ export function ReelsPlayer({
   const handleTap = (index: number) => {
     if (Date.now() < suppressTapUntilRef.current) return;
     if (Date.now() - lastTapRef.current < 300) return;
-    const el = videoRefs.current.get(index);
-    if (!el) return;
-
-    if (showPlayBtnRef.current || userPausedRef.current) {
-      void playAt(index, true);
-      return;
-    }
-
-    if (!el.paused) {
-      if (el.muted || isMutedRef.current) {
-        void playAt(index, true);
-        return;
-      }
-      userPausedRef.current = true;
-      el.pause();
-      setPlayBtnVisible(true);
-      return;
-    }
-
-    void playAt(index, true);
-  };
-
-  const handleResume = (index: number) => {
-    suppressParentTap();
+    if (!isMutedRef.current) return;
     void playAt(index, true);
   };
 
@@ -379,18 +340,15 @@ export function ReelsPlayer({
                 playsInline
                 autoPlay={index === currentIndex}
                 preload={index === currentIndex ? 'auto' : 'metadata'}
-                onPlaying={() => {
-                  if (index === currentIndex) setPlayBtnVisible(false);
-                }}
-                onPause={() => {
-                  if (index === currentIndex && userPausedRef.current) {
-                    setPlayBtnVisible(true);
-                  }
-                }}
                 onCanPlay={() => {
-                  if (index === currentIndex && !userPausedRef.current) {
+                  if (index === currentIndex) {
                     const el = videoRefs.current.get(index);
                     if (el?.paused) schedulePlay(index, false);
+                  }
+                }}
+                onPause={() => {
+                  if (index === currentIndexRef.current) {
+                    schedulePlay(index, false);
                   }
                 }}
               />
@@ -401,34 +359,18 @@ export function ReelsPlayer({
                 </p>
               )}
 
-              {index === currentIndex && showSoundHint && !showPlayBtn && (
+              {index === currentIndex && showSoundHint && (
                 <button
                   type="button"
                   className="absolute left-1/2 top-24 z-30 rounded-full bg-black/70 px-4 py-2 text-sm font-medium text-white"
                   onPointerDown={(e) => {
                     e.stopPropagation();
-                    handleResume(index);
+                    suppressParentTap();
+                    void playAt(index, true);
                   }}
                   onClick={(e) => e.stopPropagation()}
                 >
                   🔊 Барои садо пахш кунед
-                </button>
-              )}
-
-              {index === currentIndex && showPlayBtn && (
-                <button
-                  type="button"
-                  aria-label="Пахш"
-                  className="absolute inset-0 z-30 flex items-center justify-center bg-black/25"
-                  onPointerDown={(e) => {
-                    e.stopPropagation();
-                    handleResume(index);
-                  }}
-                  onClick={(e) => e.stopPropagation()}
-                >
-                  <span className="flex h-20 w-20 items-center justify-center rounded-full bg-black/55 text-4xl text-white shadow-lg">
-                    ▶
-                  </span>
                 </button>
               )}
 
