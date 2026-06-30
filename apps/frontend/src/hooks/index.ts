@@ -4,7 +4,7 @@ import { useAuthStore, useFeedStore } from '@/store';
 
 const WS_URL = import.meta.env.VITE_WS_URL ?? window.location.origin;
 
-export { useSoundUnlock, isSoundUnlocked } from './useSoundUnlock';
+export { useSoundUnlock, isSoundUnlocked, unlockSoundGlobal } from './useSoundUnlock';
 
 export function useTimedOut(active: boolean, ms: number): boolean {
   const [timedOut, setTimedOut] = useState(false);
