@@ -34,6 +34,7 @@ export interface Video {
   authorName: string;
   authorAvatar: string;
   musicTitle: string;
+  hasAudio?: boolean;
   likes: number;
   views: number;
   commentsCount: number;

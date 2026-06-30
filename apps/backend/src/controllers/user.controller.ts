@@ -8,6 +8,8 @@ import { serializeUser } from '../services/auth.service.js';
 import { enrichVideos } from '../services/feed.service.js';
 import { isFallbackMode } from '../store/fallback.js';
 import * as fb from '../services/fallback.service.js';
+import { resolveCategoryQuery, isFormatQuery } from '../utils/categorySearch.js';
+import { CATEGORIES as FEED_CATEGORIES } from '../services/feed.service.js';
 import type { AuthRequest } from '../middleware/auth.js';
 
 const preferencesSchema = z.object({
@@ -288,17 +290,27 @@ export async function searchVideos(req: AuthRequest, res: Response): Promise<voi
     return;
   }
 
-  const videos = await Video.find({
-    $or: [
-      { caption: { $regex: q, $options: 'i' } },
-      { hashtags: { $regex: q, $options: 'i' } },
-      { category: { $regex: q, $options: 'i' } },
-      { authorName: { $regex: q, $options: 'i' } },
-      { musicTitle: { $regex: q, $options: 'i' } },
-    ],
-  })
-    .limit(24)
-    .lean();
+  const categoryId = resolveCategoryQuery(q);
+  const formatFilter = isFormatQuery(q) ? q.toLowerCase() : null;
+
+  let filter: Record<string, unknown>;
+  if (categoryId && FEED_CATEGORIES.includes(categoryId)) {
+    filter = { category: categoryId };
+  } else if (formatFilter) {
+    filter = { format: formatFilter };
+  } else {
+    filter = {
+      $or: [
+        { caption: { $regex: q, $options: 'i' } },
+        { hashtags: { $regex: q, $options: 'i' } },
+        { category: { $regex: q, $options: 'i' } },
+        { authorName: { $regex: q, $options: 'i' } },
+        { musicTitle: { $regex: q, $options: 'i' } },
+      ],
+    };
+  }
+
+  const videos = await Video.find(filter).sort({ _id: -1 }).limit(24).lean();
 
   const enriched = await enrichVideos(videos as unknown as import('../models/Video.js').IVideo[], req.user!.userId);
   res.json({ videos: enriched });

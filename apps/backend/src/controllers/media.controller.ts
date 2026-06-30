@@ -62,7 +62,6 @@ export async function streamMedia(req: Request, res: Response): Promise<void> {
       method,
       headers,
       redirect: 'follow',
-      signal: AbortSignal.timeout(30_000),
     });
 
     if (!upstream.ok) {
@@ -70,7 +69,7 @@ export async function streamMedia(req: Request, res: Response): Promise<void> {
       return;
     }
 
-    const status = req.headers.range ? 206 : upstream.status === 206 ? 206 : 200;
+    const status = upstream.status;
     res.status(status);
     res.setHeader('Content-Type', upstream.headers.get('content-type') ?? 'video/mp4');
     res.setHeader('Accept-Ranges', upstream.headers.get('accept-ranges') ?? 'bytes');

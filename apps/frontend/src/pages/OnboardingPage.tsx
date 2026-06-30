@@ -5,7 +5,7 @@ import { useOnboardingStore, useAuthStore } from '@/store';
 import { completeOnboarding } from '@/api/client';
 import { useTelegram } from '@/hooks';
 
-const STEPS = ['Воридшавӣ', 'Профил', 'Категорияҳо'];
+const STEPS = ['Категорияҳо', 'Профил', 'Оғоз'];
 
 export function OnboardingPage() {
   const navigate = useNavigate();
@@ -47,7 +47,7 @@ export function OnboardingPage() {
         categories,
       });
       setUser(user);
-      navigate('/reels', { replace: true });
+      navigate('/categories', { replace: true });
     } catch {
       setError('Хатогӣ рух дод. Боз кӯшиш кунед.');
     } finally {
@@ -69,32 +69,29 @@ export function OnboardingPage() {
       )}
 
       {step === 0 && (
-        <div className="flex flex-1 flex-col items-center justify-center text-center">
-          <h1 className="ig-gradient-text text-6xl font-bold italic tracking-tight">Instagram</h1>
-          <p className="mt-3 max-w-xs text-sm text-ig-muted">
-            Reels Mini App — видёҳои кӯтоҳ бо дизайни воқии Instagram
+        <>
+          <h1 className="mb-1 text-2xl font-bold">Категорияҳои дӯстдошта</h1>
+          <p className="mb-4 text-sm text-ig-muted">
+            Аввал категория интихоб кунед — видёҳо мувофиқи ин намоиш дода мешаванд ({categories.length}/5+)
           </p>
-          {tgUser && (
-            <div className="mt-8 flex items-center gap-3 rounded-2xl border border-ig-border bg-ig-surface px-4 py-3">
-              <img
-                src={displayAvatar || 'https://i.pravatar.cc/80'}
-                alt=""
-                className="h-12 w-12 rounded-full object-cover"
-              />
-              <div className="text-left">
-                <p className="text-sm font-semibold">{tgUser.first_name}</p>
-                <p className="text-xs text-ig-muted">@{tgUser.username ?? 'telegram'}</p>
-              </div>
-            </div>
-          )}
-          <button
-            type="button"
-            onClick={next}
-            className="mt-10 w-full max-w-xs rounded-xl bg-ig-accent py-3.5 text-sm font-semibold text-white"
-          >
-            {isTelegram ? 'Идома бо Telegram' : 'Оғоз кардан'}
-          </button>
-        </div>
+          <div className="grid flex-1 grid-cols-2 gap-2 overflow-y-auto content-start">
+            {CATEGORIES.map((cat) => (
+              <button
+                key={cat.id}
+                type="button"
+                onClick={() => toggleCategory(cat.id)}
+                className={`rounded-xl border px-3 py-3 text-left text-sm transition ${
+                  categories.includes(cat.id)
+                    ? 'border-ig-accent bg-ig-accent/10'
+                    : 'border-ig-border bg-ig-surface'
+                }`}
+              >
+                <span className="mr-2">{cat.emoji}</span>
+                {cat.label}
+              </button>
+            ))}
+          </div>
+        </>
       )}
 
       {step === 1 && (
@@ -130,36 +127,25 @@ export function OnboardingPage() {
       )}
 
       {step === 2 && (
-        <>
-          <h1 className="mb-1 text-2xl font-bold">Категорияҳо</h1>
-          <p className="mb-4 text-sm text-ig-muted">
-            Ҳадди ақал 5 категория ({categories.length}/5+)
+        <div className="flex flex-1 flex-col items-center justify-center text-center">
+          <h1 className="ig-gradient-text text-5xl font-bold italic tracking-tight">Instagram</h1>
+          <p className="mt-3 max-w-xs text-sm text-ig-muted">
+            Reels Mini App — омодаед! Категорияҳо: {categories.length}
           </p>
-          <div className="grid flex-1 grid-cols-2 gap-2 overflow-y-auto content-start">
-            {CATEGORIES.map((cat) => (
-              <button
-                key={cat.id}
-                type="button"
-                onClick={() => toggleCategory(cat.id)}
-                className={`rounded-xl border px-3 py-3 text-left text-sm transition ${
-                  categories.includes(cat.id)
-                    ? 'border-ig-accent bg-ig-accent/10'
-                    : 'border-ig-border bg-ig-surface'
-                }`}
-              >
-                <span className="mr-2">{cat.emoji}</span>
-                {cat.label}
-              </button>
-            ))}
-          </div>
-          <div className="hidden">
-            {FORMATS.map((fmt) => (
-              <button key={fmt.id} type="button" onClick={() => toggleFormat(fmt.id)}>
-                {fmt.label}
-              </button>
-            ))}
-          </div>
-        </>
+          {tgUser && (
+            <div className="mt-8 flex items-center gap-3 rounded-2xl border border-ig-border bg-ig-surface px-4 py-3">
+              <img
+                src={displayAvatar || 'https://i.pravatar.cc/80'}
+                alt=""
+                className="h-12 w-12 rounded-full object-cover"
+              />
+              <div className="text-left">
+                <p className="text-sm font-semibold">{tgUser.first_name}</p>
+                <p className="text-xs text-ig-muted">@{tgUser.username ?? 'telegram'}</p>
+              </div>
+            </div>
+          )}
+        </div>
       )}
 
       {error && <p className="mb-2 text-sm text-ig-accent">{error}</p>}
@@ -176,7 +162,14 @@ export function OnboardingPage() {
           {step < STEPS.length - 1 ? (
             <button
               type="button"
-              onClick={next}
+              onClick={() => {
+                if (step === 0 && categories.length < 5) {
+                  setError('Ҳадди ақал 5 категория интихоб кунед');
+                  return;
+                }
+                setError('');
+                next();
+              }}
               className="flex-1 rounded-xl bg-ig-accent py-3 text-sm font-semibold text-white"
             >
               Идома

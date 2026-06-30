@@ -75,7 +75,7 @@ async function playVideoElement(
   applyAudio(el, true);
   if (await tryPlayVideo(el, label)) return true;
 
-  for (const delay of [150, 400, 900]) {
+  for (const delay of [50, 150, 300]) {
     await new Promise((r) => window.setTimeout(r, delay));
     if (await tryPlayVideo(el, `${label}-retry@${delay}ms`)) return true;
   }
@@ -116,6 +116,7 @@ export function ReelsPlayer({
 
   const updateVideo = useFeedStore((s) => s.updateVideo);
   const recoverAttemptsRef = useRef<Map<number, number>>(new Map());
+  const scrollRafRef = useRef(0);
   const currentVideoId = videos[currentIndex]?.id;
 
   useEffect(() => {
@@ -274,16 +275,17 @@ export function ReelsPlayer({
   }, [isMuted, currentIndex, syncMuteOnElement]);
 
   const handleScroll = () => {
-    const container = containerRef.current;
-    if (!container) return;
-    const index = Math.round(container.scrollTop / container.clientHeight);
-    if (index !== currentIndex && index >= 0 && index < videos.length) {
-      if (isMutedRef.current) {
-        unmuteCurrent(index, 'scroll');
+    if (scrollRafRef.current) return;
+    scrollRafRef.current = window.requestAnimationFrame(() => {
+      scrollRafRef.current = 0;
+      const container = containerRef.current;
+      if (!container) return;
+      const index = Math.round(container.scrollTop / container.clientHeight);
+      if (index !== currentIndex && index >= 0 && index < videos.length) {
+        setCurrentIndex(index);
+        onIndexChange?.(index);
       }
-      setCurrentIndex(index);
-      onIndexChange?.(index);
-    }
+    });
   };
 
   const handleDoubleTap = async (e: React.MouseEvent | React.TouchEvent, video: Video) => {
@@ -398,10 +400,22 @@ export function ReelsPlayer({
       <div
         ref={containerRef}
         onScroll={handleScroll}
-        className={`${immersive ? 'h-full' : 'h-full'} snap-y snap-mandatory overflow-y-scroll scroll-smooth`}
+        className={`${immersive ? 'h-full' : 'h-full'} snap-y snap-mandatory overflow-y-scroll`}
         style={{ scrollSnapType: 'y mandatory' }}
       >
-        {videos.map((video, index) => (
+        {videos.map((video, index) => {
+          const inWindow = Math.abs(index - currentIndex) <= 1;
+          if (!inWindow) {
+            return (
+              <div
+                key={video.id}
+                className="relative h-full min-h-full w-full snap-start snap-always bg-black"
+                aria-hidden
+              />
+            );
+          }
+
+          return (
           <div
             key={video.id}
             className="relative h-full min-h-full w-full snap-start snap-always bg-black"
@@ -422,8 +436,9 @@ export function ReelsPlayer({
               className="h-full w-full object-cover"
               loop
               playsInline
-              autoPlay={index === currentIndex}
-              preload={index === currentIndex ? 'auto' : 'metadata'}
+              preload={
+                index === currentIndex ? 'auto' : index === currentIndex + 1 ? 'metadata' : 'none'
+              }
               onTimeUpdate={(e) => {
                 const el = e.currentTarget;
                 if (index !== currentIndex) return;
@@ -462,7 +477,13 @@ export function ReelsPlayer({
               }}
             />
 
-            {index === currentIndex && showSoundHint && !showPlayBtn && isMuted && (
+            {index === currentIndex && !isMuted && video.hasAudio === false && (
+              <p className="absolute left-1/2 top-24 z-20 -translate-x-1/2 rounded-full bg-black/70 px-3 py-1.5 text-xs text-white/80">
+                Ин видео садо надорад
+              </p>
+            )}
+
+            {index === currentIndex && showSoundHint && !showPlayBtn && (
               <button
                 type="button"
                 className="absolute left-1/2 top-24 z-20 -translate-x-1/2 rounded-full bg-black/70 px-4 py-2 text-sm font-medium text-white backdrop-blur-sm"
@@ -517,7 +538,7 @@ export function ReelsPlayer({
                   {video.hashtags.map((h) => `#${h}`).join(' ')}
                 </p>
               )}
-              {video.musicTitle && (
+              {video.musicTitle && video.hasAudio !== false && (
                 <div className="mt-2 flex items-center gap-2 overflow-hidden">
                   <IconMusic className="h-3 w-3 shrink-0 animate-pulse" />
                   <p className="truncate text-xs drop-shadow">{video.musicTitle}</p>
@@ -574,7 +595,8 @@ export function ReelsPlayer({
               </button>
             </div>
           </div>
-        ))}
+          );
+        })}
       </div>
 
       {heartAnim && (

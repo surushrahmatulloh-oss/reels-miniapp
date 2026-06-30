@@ -16,6 +16,8 @@ import {
   type MemoryVideo,
 } from '../store/fallback.js';
 import { savePersistedStore } from '../persist.js';
+import { resolveCategoryQuery, isFormatQuery } from '../utils/categorySearch.js';
+import { urlHasAudio } from '../data/audioMp4Pool.js';
 
 /** Stable feed order per user — pagination without re-shuffle */
 const feedOrders = new Map<string, string[]>();
@@ -174,6 +176,7 @@ function enrichVideo(v: MemoryVideo, userId: string) {
     authorName: v.authorName,
     authorAvatar: v.authorAvatar,
     musicTitle: v.musicTitle,
+    hasAudio: urlHasAudio(v.url),
     likes: v.likes,
     views: v.views,
     commentsCount: v.commentsCount,
@@ -187,6 +190,9 @@ function enrichVideo(v: MemoryVideo, userId: string) {
 
 function matchesQuery(v: MemoryVideo, q: string): boolean {
   const lower = q.toLowerCase();
+  const categoryId = resolveCategoryQuery(q);
+  if (categoryId) return v.category === categoryId;
+  if (isFormatQuery(q)) return v.format === q.toLowerCase();
   return (
     v.caption.toLowerCase().includes(lower) ||
     v.category.toLowerCase().includes(lower) ||

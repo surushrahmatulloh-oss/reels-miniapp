@@ -5,6 +5,7 @@ import { Like, Save } from '../models/Interaction.js';
 import { cacheGet, cacheSet } from '../redis.js';
 import type { VideoFormat } from '../types/index.js';
 import { normalizePlaybackUrl } from '../data/workingMp4Pool.js';
+import { urlHasAudio } from '../data/audioMp4Pool.js';
 
 const CATEGORIES = [
   'music',
@@ -132,6 +133,7 @@ export async function buildFeed(params: {
 
   const hasMore = page.length >= limit;
   page = page.slice(0, limit);
+  page.sort((a, b) => Number(urlHasAudio(b.url ?? '')) - Number(urlHasAudio(a.url ?? '')));
 
   const nextCursor =
     hasMore && page.length > 0 ? page[page.length - 1]!._id.toString() : null;
@@ -177,6 +179,7 @@ export async function enrichVideos(
       authorName: video.authorName,
       authorAvatar: video.authorAvatar,
       musicTitle: video.musicTitle,
+      hasAudio: urlHasAudio(video.url ?? ''),
       likes: video.likes,
       views: video.views,
       commentsCount: video.commentsCount,

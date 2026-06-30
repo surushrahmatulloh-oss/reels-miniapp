@@ -1,20 +1,31 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { searchUsers, searchVideos } from '@/api/client';
-import { useFeedStore } from '@/store';
+import { useAuthStore, useFeedStore } from '@/store';
 import { BottomNav } from '@/components/BottomNav';
 import { VideoGridTile } from '@/components/VideoGridTile';
 import { SearchSkeleton } from '@/components/Skeleton';
 import { toVideo } from '@/utils/video';
+import { buildSearchQuery, resolveCategoryQuery } from '@/utils/categorySearch';
 import { CATEGORIES } from '@/types';
 import type { Video } from '@/types';
 import { IconSearch } from '@/components/icons/InstagramIcons';
 
 export function SearchPage() {
+  const user = useAuthStore((s) => s.user);
+  const userCategories = user?.preferences.categories ?? [];
   const [query, setQuery] = useState('');
-  const [activeCategory, setActiveCategory] = useState<string | null>(null);
+  const [activeCategory, setActiveCategory] = useState<string | null>(
+    () => userCategories[0] ?? null,
+  );
   const [debounced, setDebounced] = useState('');
   const openPlayback = useFeedStore((s) => s.openPlayback);
+
+  useEffect(() => {
+    if (!activeCategory && userCategories[0]) {
+      setActiveCategory(userCategories[0] ?? null);
+    }
+  }, [activeCategory, userCategories]);
 
   const isTextSearch = debounced.length >= 2;
 
@@ -27,7 +38,7 @@ export function SearchPage() {
     );
   };
 
-  const exploreQuery = activeCategory ?? 'reels';
+  const exploreQuery = activeCategory ?? userCategories[0] ?? 'music';
 
   const {
     data: exploreVideos = [],
@@ -41,6 +52,8 @@ export function SearchPage() {
     staleTime: 120_000,
     enabled: !isTextSearch,
   });
+
+  const searchQ = buildSearchQuery(debounced, isTextSearch ? null : null);
 
   const {
     data: users = [],
@@ -59,8 +72,8 @@ export function SearchPage() {
     error: searchErr,
     refetch: refetchSearch,
   } = useQuery({
-    queryKey: ['search-videos', debounced],
-    queryFn: () => searchVideos(debounced),
+    queryKey: ['search-videos', searchQ],
+    queryFn: () => searchVideos(searchQ),
     enabled: isTextSearch,
   });
 
@@ -81,6 +94,8 @@ export function SearchPage() {
     setDebounced('');
   };
 
+  const resolvedHint = isTextSearch ? resolveCategoryQuery(debounced) : null;
+
   return (
     <div className="flex h-full flex-col bg-black pb-14">
       <div className="sticky top-0 z-10 border-b border-ig-border bg-black px-4 py-3">
@@ -89,28 +104,39 @@ export function SearchPage() {
           <input
             value={query}
             onChange={(e) => handleSearchInput(e.target.value)}
-            placeholder="Ҷустуҷӯ"
+            placeholder="Ҷустуҷӯ ё категория (масалан: Мусиқӣ)"
             className="flex-1 bg-transparent text-sm text-white outline-none placeholder:text-ig-muted"
           />
         </div>
+        {resolvedHint && (
+          <p className="mt-2 text-xs text-ig-accent">
+            Категория: {CATEGORIES.find((c) => c.id === resolvedHint)?.label ?? resolvedHint}
+          </p>
+        )}
       </div>
 
       {!isTextSearch && (
         <div className="flex gap-2 overflow-x-auto px-4 py-3 scrollbar-hide">
-          {CATEGORIES.map((cat) => (
-            <button
-              key={cat.id}
-              type="button"
-              onClick={() => selectCategory(cat.id)}
-              className={`shrink-0 rounded-full border px-3 py-1.5 text-xs font-medium transition ${
-                activeCategory === cat.id
-                  ? 'border-ig-accent bg-ig-accent/15 text-white'
-                  : 'border-ig-border text-ig-muted'
-              }`}
-            >
-              {cat.emoji} {cat.label}
-            </button>
-          ))}
+          {CATEGORIES.map((cat) => {
+            const isFav = userCategories.includes(cat.id);
+            return (
+              <button
+                key={cat.id}
+                type="button"
+                onClick={() => selectCategory(cat.id)}
+                className={`shrink-0 rounded-full border px-3 py-1.5 text-xs font-medium transition ${
+                  activeCategory === cat.id
+                    ? 'border-ig-accent bg-ig-accent/15 text-white'
+                    : isFav
+                      ? 'border-ig-accent/50 text-white'
+                      : 'border-ig-border text-ig-muted'
+                }`}
+              >
+                {cat.emoji} {cat.label}
+                {isFav ? ' ★' : ''}
+              </button>
+            );
+          })}
         </div>
       )}
 
@@ -162,7 +188,7 @@ export function SearchPage() {
           </div>
         ) : !listLoading && !listError ? (
           <p className="py-16 text-center text-sm text-ig-muted">
-            {isTextSearch ? 'Натиҷа ёфт нашуд' : 'Видё нест — категорияи дигар интихоб кунед'}
+            {isTextSearch ? 'Натиҷа ёфт нашуд — номи категорияро санҷед' : 'Видё нест — категорияи дигар интихоб кунед'}
           </p>
         ) : null}
       </div>

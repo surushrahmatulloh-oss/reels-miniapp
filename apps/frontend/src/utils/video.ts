@@ -24,6 +24,7 @@ export function toVideo(partial: Partial<Video> & { id: string; playUrl?: string
     authorName: partial.authorName ?? '@user',
     authorAvatar: partial.authorAvatar ?? 'https://i.pravatar.cc/40',
     musicTitle: partial.musicTitle ?? '',
+    hasAudio: partial.hasAudio,
     likes: partial.likes ?? 0,
     views: partial.views ?? 0,
     commentsCount: partial.commentsCount ?? 0,

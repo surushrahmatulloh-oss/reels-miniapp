@@ -45,12 +45,14 @@ interface FeedState {
   currentIndex: number;
   nextCursor: string | null;
   hasMore: boolean;
+  activeCategories: string[] | null;
   isMuted: boolean;
   playbackOpen: boolean;
   playbackVideos: Video[];
   playbackIndex: number;
   setVideos: (videos: Video[], append?: boolean) => void;
   setCurrentIndex: (index: number) => void;
+  setActiveCategories: (categories: string[] | null) => void;
   setPlaybackIndex: (index: number) => void;
   setPagination: (nextCursor: string | null, hasMore: boolean) => void;
   updateVideo: (id: string, patch: Partial<Video>) => void;
@@ -64,6 +66,7 @@ export const useFeedStore = create<FeedState>((set, get) => ({
   currentIndex: 0,
   nextCursor: null,
   hasMore: true,
+  activeCategories: null,
   isMuted: true,
   playbackOpen: false,
   playbackVideos: [],
@@ -74,6 +77,7 @@ export const useFeedStore = create<FeedState>((set, get) => ({
       return { videos: dedupeVideosByUrl(merged) };
     }),
   setCurrentIndex: (index) => set({ currentIndex: index }),
+  setActiveCategories: (activeCategories) => set({ activeCategories }),
   setPlaybackIndex: (index) => set({ playbackIndex: index }),
   setPagination: (nextCursor, hasMore) => set({ nextCursor, hasMore }),
   updateVideo: (id, patch) =>

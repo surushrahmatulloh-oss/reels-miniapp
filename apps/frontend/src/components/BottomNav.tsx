@@ -8,7 +8,7 @@ import {
 import { useAuthStore } from '@/store';
 
 const links = [
-  { to: '/feed', label: 'Лента', Icon: IconHome, isAvatar: false },
+  { to: '/categories', label: 'Категория', Icon: IconHome, isAvatar: false },
   { to: '/search', label: 'Ҷустуҷӯ', Icon: IconSearch, isAvatar: false },
   { to: '/create', label: 'Илова', Icon: IconAdd, isAvatar: false },
   { to: '/reels', label: 'Reels', Icon: IconReels, isAvatar: false },

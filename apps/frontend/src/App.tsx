@@ -6,6 +6,7 @@ import { authTelegram, pingBackend, setAuthToken } from '@/api/client';
 import { useTelegram } from '@/hooks';
 import { LoadingScreen } from '@/components/LoadingScreen';
 import { OnboardingPage } from '@/pages/OnboardingPage';
+import { CategoriesPage } from '@/pages/CategoriesPage';
 import { FeedPage } from '@/pages/FeedPage';
 import { ReelsPage } from '@/pages/ReelsPage';
 import { ProfilePage } from '@/pages/ProfilePage';
@@ -169,15 +170,27 @@ function AppRoutes() {
     );
   }
 
+  const needsCategories = !user.preferences?.categories?.length;
+  if (needsCategories) {
+    return (
+      <Routes>
+        <Route path="/categories" element={<CategoriesPage />} />
+        <Route path="/onboarding" element={<OnboardingPage />} />
+        <Route path="*" element={<Navigate to="/categories" replace />} />
+      </Routes>
+    );
+  }
+
   return (
     <Routes>
+      <Route path="/categories" element={<CategoriesPage />} />
       <Route path="/feed" element={<FeedPage />} />
       <Route path="/reels" element={<ReelsPage />} />
       <Route path="/search" element={<SearchPage />} />
       <Route path="/create" element={<CreatePage />} />
       <Route path="/profile" element={<ProfilePage />} />
-      <Route path="/notifications" element={<Navigate to="/reels" replace />} />
-      <Route path="*" element={<Navigate to="/reels" replace />} />
+      <Route path="/notifications" element={<Navigate to="/categories" replace />} />
+      <Route path="*" element={<Navigate to="/categories" replace />} />
     </Routes>
   );
 }
