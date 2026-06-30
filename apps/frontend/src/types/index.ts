@@ -27,10 +27,12 @@ export interface Video {
   url: string;
   playUrl?: string;
   thumbnailUrl: string;
+  title?: string;
   format: VideoFormat;
   category: string;
   hashtags: string[];
   caption: string;
+  title?: string;
   authorName: string;
   authorAvatar: string;
   musicTitle: string;
@@ -74,18 +76,18 @@ export interface FeedResponse {
 }
 
 export const CATEGORIES = [
+  { id: 'cars', label: 'Автомобилҳо', emoji: '🚗' },
+  { id: 'sport', label: 'Варзиш', emoji: '🏃' },
+  { id: 'football', label: 'Футбол', emoji: '⚽' },
   { id: 'music', label: 'Мусиқӣ', emoji: '🎵' },
-  { id: 'travel', label: 'Сафар', emoji: '✈️' },
-  { id: 'food', label: 'Таом', emoji: '🍳' },
-  { id: 'sport', label: 'Варзиш', emoji: '⚽' },
+  { id: 'cinema', label: 'Кино', emoji: '🎬' },
   { id: 'tech', label: 'Технология', emoji: '💻' },
-  { id: 'comedy', label: 'Комедия', emoji: '😂' },
-  { id: 'fashion', label: 'Мода', emoji: '👗' },
+  { id: 'gaming', label: 'Бозиҳо', emoji: '🎮' },
+  { id: 'comedy', label: 'Ҳаҷв', emoji: '😂' },
+  { id: 'news', label: 'Хабарҳо', emoji: '📰' },
   { id: 'nature', label: 'Табиат', emoji: '🌿' },
-  { id: 'education', label: 'Таълим', emoji: '📚' },
-  { id: 'dance', label: 'Рақс', emoji: '💃' },
-  { id: 'cooking', label: 'Пухтупаз', emoji: '👨‍🍳' },
-  { id: 'fitness', label: 'Фитнес', emoji: '💪' },
+  { id: 'travel', label: 'Сафар', emoji: '✈️' },
+  { id: 'cooking', label: 'Ошпазӣ', emoji: '👨‍🍳' },
 ] as const;
 
 export const FORMATS = [

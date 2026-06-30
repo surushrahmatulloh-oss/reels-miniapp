@@ -8,7 +8,7 @@ import { ReelsPlayer } from '@/components/ReelsPlayer';
 import { BottomNav } from '@/components/BottomNav';
 import { FeedSkeleton } from '@/components/Skeleton';
 
-const APP_VERSION = '5.0.0';
+const APP_VERSION = '5.1.0';
 
 export function ReelsPage() {
   useSocket();

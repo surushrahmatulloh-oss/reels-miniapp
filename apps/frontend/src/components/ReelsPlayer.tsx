@@ -10,6 +10,7 @@ import {
   markVideoViewed,
 } from '@/api/client';
 import { useFeedStore } from '@/store';
+import { useSoundUnlock, isSoundUnlocked } from '@/hooks/useSoundUnlock';
 import { CommentsSheet } from './CommentsSheet';
 import {
   IconHeart,
@@ -84,6 +85,7 @@ async function playVideoElement(
 }
 
 function readMutedPref(): boolean {
+  if (isSoundUnlocked()) return false;
   return window.localStorage.getItem('reels:muted') === '1';
 }
 
@@ -107,6 +109,7 @@ export function ReelsPlayer({
   const [showPlayBtn, setShowPlayBtn] = useState(false);
   const [showSoundHint, setShowSoundHint] = useState(false);
 
+  const { unlock: unlockSound } = useSoundUnlock();
   const storeIndex = useFeedStore((s) => s.currentIndex);
   const setStoreIndex = useFeedStore((s) => s.setCurrentIndex);
   const currentIndex = controlledIndex ?? storeIndex;
@@ -129,19 +132,23 @@ export function ReelsPlayer({
     if (el) applyAudio(el, isMutedRef.current);
   }, []);
 
-  const unmuteCurrent = useCallback((index: number, reason: string) => {
-    playGenRef.current += 1;
-    isMutedRef.current = false;
-    setIsMuted(false);
-    setShowSoundHint(false);
+  const unmuteCurrent = useCallback(
+    (index: number, reason: string) => {
+      playGenRef.current += 1;
+      unlockSound();
+      isMutedRef.current = false;
+      setIsMuted(false);
+      setShowSoundHint(false);
 
-    const el = videoRefs.current.get(index);
-    if (!el) return;
+      const el = videoRefs.current.get(index);
+      if (!el) return;
 
-    applyAudio(el, false);
-    void tryPlayVideo(el, `unmute:${reason}`);
-    console.log(LOG, 'unmuted', { index, reason });
-  }, []);
+      applyAudio(el, false);
+      void tryPlayVideo(el, `unmute:${reason}`);
+      console.log(LOG, 'unmuted', { index, reason });
+    },
+    [unlockSound],
+  );
 
   const muteCurrent = useCallback((index: number) => {
     isMutedRef.current = true;
@@ -175,7 +182,7 @@ export function ReelsPlayer({
   const startPlayback = useCallback(
     (index: number, opts?: { withSound?: boolean; allowMutedFallback?: boolean }) => {
       const gen = ++playGenRef.current;
-      const withSound = opts?.withSound ?? !isMutedRef.current;
+      const withSound = opts?.withSound ?? (!isMutedRef.current || isSoundUnlocked());
       const allowMutedFallback = opts?.allowMutedFallback ?? !withSound;
 
       userPausedRef.current = false;
@@ -235,34 +242,6 @@ export function ReelsPlayer({
 
     return () => window.clearTimeout(timer);
   }, [currentIndex, currentVideoId, startPlayback, onLoadMore]);
-
-  useEffect(() => {
-    const el = videoRefs.current.get(currentIndex);
-    if (!el) return;
-
-    const gen = playGenRef.current;
-    const onReady = () => {
-      if (gen !== playGenRef.current || userPausedRef.current) return;
-      if (!el.paused && el.currentTime > 0) return;
-
-      void playVideoElement(el, `ready idx=${currentIndex}`, {
-        withSound: !isMutedRef.current,
-        allowMutedFallback: isMutedRef.current,
-      }).then((ok) => {
-        if (gen !== playGenRef.current) return;
-        playBlockedRef.current = !ok && el.paused;
-        syncPlayOverlay(currentIndex);
-      });
-    };
-
-    el.addEventListener('loadeddata', onReady);
-    el.addEventListener('canplay', onReady);
-
-    return () => {
-      el.removeEventListener('loadeddata', onReady);
-      el.removeEventListener('canplay', onReady);
-    };
-  }, [currentIndex, currentVideoId, syncPlayOverlay]);
 
   useEffect(() => {
     if (!showSoundHint) return;
@@ -437,7 +416,11 @@ export function ReelsPlayer({
               loop
               playsInline
               preload={
-                index === currentIndex ? 'auto' : index === currentIndex + 1 ? 'metadata' : 'none'
+                index === currentIndex
+                  ? 'auto'
+                  : Math.abs(index - currentIndex) === 1
+                    ? 'metadata'
+                    : 'none'
               }
               onTimeUpdate={(e) => {
                 const el = e.currentTarget;

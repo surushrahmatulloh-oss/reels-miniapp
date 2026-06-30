@@ -32,8 +32,8 @@ export function OnboardingPage() {
   const back = () => setStep(Math.max(step - 1, 0));
 
   const finish = async () => {
-    if (categories.length < 5) {
-      setError('Ҳадди ақал 5 категория интихоб кунед');
+    if (categories.length < 1) {
+      setError('Ҳадди ақал 1 категория интихоб кунед');
       return;
     }
     setLoading(true);
@@ -72,7 +72,7 @@ export function OnboardingPage() {
         <>
           <h1 className="mb-1 text-2xl font-bold">Категорияҳои дӯстдошта</h1>
           <p className="mb-4 text-sm text-ig-muted">
-            Аввал категория интихоб кунед — видёҳо мувофиқи ин намоиш дода мешаванд ({categories.length}/5+)
+            Аввал категория интихоб кунед ({categories.length}/1+)
           </p>
           <div className="grid flex-1 grid-cols-2 gap-2 overflow-y-auto content-start">
             {CATEGORIES.map((cat) => (
@@ -163,8 +163,8 @@ export function OnboardingPage() {
             <button
               type="button"
               onClick={() => {
-                if (step === 0 && categories.length < 5) {
-                  setError('Ҳадди ақал 5 категория интихоб кунед');
+                if (step === 0 && categories.length < 1) {
+                  setError('Ҳадди ақал 1 категория интихоб кунед');
                   return;
                 }
                 setError('');
@@ -178,7 +178,7 @@ export function OnboardingPage() {
             <button
               type="button"
               onClick={() => void finish()}
-              disabled={loading || categories.length < 5}
+              disabled={loading || categories.length < 1}
               className="flex-1 rounded-xl bg-ig-accent py-3 text-sm font-semibold text-white disabled:opacity-50"
             >
               {loading ? 'Сабр кунед...' : 'Оғоз кардан'}

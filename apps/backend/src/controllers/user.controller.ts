@@ -8,13 +8,12 @@ import { serializeUser } from '../services/auth.service.js';
 import { enrichVideos } from '../services/feed.service.js';
 import { isFallbackMode } from '../store/fallback.js';
 import * as fb from '../services/fallback.service.js';
-import { resolveCategoryQuery, isFormatQuery } from '../utils/categorySearch.js';
-import { CATEGORIES as FEED_CATEGORIES } from '../services/feed.service.js';
+import { resolveCategoryQuery, isFormatQuery, expandCategoryIds } from '../utils/categorySearch.js';
 import type { AuthRequest } from '../middleware/auth.js';
 
 const preferencesSchema = z.object({
   formats: z.array(z.enum(['reels', 'igtv', 'stories'])).min(1),
-  categories: z.array(z.string()).min(3),
+  categories: z.array(z.string()).min(1),
   language: z.string().optional(),
 });
 
@@ -31,7 +30,7 @@ const onboardingSchema = z.object({
   bio: z.string().max(150).optional(),
   avatarUrl: z.string().optional(),
   formats: z.array(z.enum(['reels', 'igtv', 'stories'])).min(1),
-  categories: z.array(z.string()).min(3),
+  categories: z.array(z.string()).min(1),
 });
 
 export async function updatePreferences(req: AuthRequest, res: Response): Promise<void> {
@@ -279,35 +278,50 @@ export async function searchUsers(req: AuthRequest, res: Response): Promise<void
 }
 
 export async function searchVideos(req: AuthRequest, res: Response): Promise<void> {
-  const q = (req.query.q as string | undefined)?.trim();
-  if (!q) {
+  const q = (req.query.q as string | undefined)?.trim() ?? '';
+  const categoryParam = (req.query.category as string | undefined)?.trim();
+
+  if (!q && !categoryParam) {
     res.json({ videos: [] });
     return;
   }
 
   if (isFallbackMode()) {
-    res.json({ videos: fb.fallbackSearchVideos(q, req.user!.userId) });
+    res.json({ videos: fb.fallbackSearchVideos(q || categoryParam || '', req.user!.userId) });
     return;
   }
 
-  const categoryId = resolveCategoryQuery(q);
-  const formatFilter = isFormatQuery(q) ? q.toLowerCase() : null;
+  const escaped = q.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+  const categoryId = categoryParam
+    ? resolveCategoryQuery(categoryParam) ?? categoryParam
+    : resolveCategoryQuery(q);
+  const formatFilter = q && isFormatQuery(q) ? q.toLowerCase() : null;
+
+  const textFilter = q
+    ? {
+        $or: [
+          { title: { $regex: escaped, $options: 'i' } },
+          { caption: { $regex: escaped, $options: 'i' } },
+          { hashtags: { $regex: escaped, $options: 'i' } },
+          { category: { $regex: escaped, $options: 'i' } },
+          { authorName: { $regex: escaped, $options: 'i' } },
+          { musicTitle: { $regex: escaped, $options: 'i' } },
+        ],
+      }
+    : null;
 
   let filter: Record<string, unknown>;
-  if (categoryId && FEED_CATEGORIES.includes(categoryId)) {
-    filter = { category: categoryId };
+  if (categoryId) {
+    const cats = expandCategoryIds([categoryId]);
+    const catFilter = { category: { $in: cats } };
+    filter = textFilter ? { $and: [catFilter, textFilter] } : catFilter;
   } else if (formatFilter) {
     filter = { format: formatFilter };
+  } else if (textFilter) {
+    filter = textFilter;
   } else {
-    filter = {
-      $or: [
-        { caption: { $regex: q, $options: 'i' } },
-        { hashtags: { $regex: q, $options: 'i' } },
-        { category: { $regex: q, $options: 'i' } },
-        { authorName: { $regex: q, $options: 'i' } },
-        { musicTitle: { $regex: q, $options: 'i' } },
-      ],
-    };
+    res.json({ videos: [] });
+    return;
   }
 
   const videos = await Video.find(filter).sort({ _id: -1 }).limit(24).lean();

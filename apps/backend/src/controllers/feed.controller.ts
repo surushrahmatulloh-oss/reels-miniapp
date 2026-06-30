@@ -1,7 +1,7 @@
 import type { Response } from 'express';
 import mongoose from 'mongoose';
 import type { VideoFormat } from '../types/index.js';
-import { buildFeed, CATEGORIES, enrichVideos, markVideoViewed } from '../services/feed.service.js';
+import { buildFeed, enrichVideos, markVideoViewed } from '../services/feed.service.js';
 import { User } from '../models/User.js';
 import { isFallbackMode } from '../store/fallback.js';
 import { isDatabaseReady } from '../db.js';
@@ -33,7 +33,7 @@ export async function getFeed(req: AuthRequest, res: Response): Promise<void> {
       ? req.query.categories
           .split(',')
           .map((s) => s.trim().toLowerCase())
-          .filter((s) => CATEGORIES.includes(s))
+          .filter(Boolean)
       : [];
 
   const user = await User.findById(req.user!.userId);

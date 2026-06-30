@@ -27,14 +27,15 @@ export function SearchPage() {
     }
   }, [activeCategory, userCategories]);
 
-  const isTextSearch = debounced.length >= 2;
+  const resolvedCategory = resolveCategoryQuery(debounced);
+  const isTextSearch = debounced.length >= 1;
 
   const handleSearchInput = (value: string) => {
     setQuery(value);
     window.clearTimeout((handleSearchInput as unknown as { timer?: number }).timer);
     (handleSearchInput as unknown as { timer?: number }).timer = window.setTimeout(
       () => setDebounced(value.trim()),
-      350,
+      200,
     );
   };
 
@@ -49,11 +50,12 @@ export function SearchPage() {
   } = useQuery({
     queryKey: ['search-explore', exploreQuery],
     queryFn: () => searchVideos(exploreQuery),
-    staleTime: 120_000,
+    staleTime: 60_000,
     enabled: !isTextSearch,
   });
 
-  const searchQ = buildSearchQuery(debounced, isTextSearch ? null : null);
+  const searchQ = buildSearchQuery(debounced, activeCategory);
+  const searchCategory = resolvedCategory ?? (activeCategory && isTextSearch ? activeCategory : undefined);
 
   const {
     data: users = [],
@@ -62,7 +64,7 @@ export function SearchPage() {
   } = useQuery({
     queryKey: ['search-users', debounced],
     queryFn: () => searchUsers(debounced),
-    enabled: isTextSearch,
+    enabled: isTextSearch && debounced.length >= 2 && !resolvedCategory,
   });
 
   const {
@@ -72,8 +74,8 @@ export function SearchPage() {
     error: searchErr,
     refetch: refetchSearch,
   } = useQuery({
-    queryKey: ['search-videos', searchQ],
-    queryFn: () => searchVideos(searchQ),
+    queryKey: ['search-videos', searchQ, searchCategory],
+    queryFn: () => searchVideos(searchQ, searchCategory),
     enabled: isTextSearch,
   });
 
@@ -89,12 +91,10 @@ export function SearchPage() {
   };
 
   const selectCategory = (catId: string) => {
-    setActiveCategory((prev) => (prev === catId ? null : catId));
+    setActiveCategory(catId);
     setQuery('');
     setDebounced('');
   };
-
-  const resolvedHint = isTextSearch ? resolveCategoryQuery(debounced) : null;
 
   return (
     <div className="flex h-full flex-col bg-black pb-14">
@@ -104,41 +104,39 @@ export function SearchPage() {
           <input
             value={query}
             onChange={(e) => handleSearchInput(e.target.value)}
-            placeholder="Ҷустуҷӯ ё категория (масалан: Мусиқӣ)"
+            placeholder="Ҷустуҷӯ: Футбол, Мусиқӣ, hashtag..."
             className="flex-1 bg-transparent text-sm text-white outline-none placeholder:text-ig-muted"
           />
         </div>
-        {resolvedHint && (
+        {resolvedCategory && (
           <p className="mt-2 text-xs text-ig-accent">
-            Категория: {CATEGORIES.find((c) => c.id === resolvedHint)?.label ?? resolvedHint}
+            Категория: {CATEGORIES.find((c) => c.id === resolvedCategory)?.label ?? resolvedCategory}
           </p>
         )}
       </div>
 
-      {!isTextSearch && (
-        <div className="flex gap-2 overflow-x-auto px-4 py-3 scrollbar-hide">
-          {CATEGORIES.map((cat) => {
-            const isFav = userCategories.includes(cat.id);
-            return (
-              <button
-                key={cat.id}
-                type="button"
-                onClick={() => selectCategory(cat.id)}
-                className={`shrink-0 rounded-full border px-3 py-1.5 text-xs font-medium transition ${
-                  activeCategory === cat.id
-                    ? 'border-ig-accent bg-ig-accent/15 text-white'
-                    : isFav
-                      ? 'border-ig-accent/50 text-white'
-                      : 'border-ig-border text-ig-muted'
-                }`}
-              >
-                {cat.emoji} {cat.label}
-                {isFav ? ' ★' : ''}
-              </button>
-            );
-          })}
-        </div>
-      )}
+      <div className="flex gap-2 overflow-x-auto px-4 py-3 scrollbar-hide">
+        {CATEGORIES.map((cat) => {
+          const isFav = userCategories.includes(cat.id);
+          return (
+            <button
+              key={cat.id}
+              type="button"
+              onClick={() => selectCategory(cat.id)}
+              className={`shrink-0 rounded-full border px-3 py-1.5 text-xs font-medium transition ${
+                activeCategory === cat.id
+                  ? 'border-ig-accent bg-ig-accent/15 text-white'
+                  : isFav
+                    ? 'border-ig-accent/50 text-white'
+                    : 'border-ig-border text-ig-muted'
+              }`}
+            >
+              {cat.emoji} {cat.label}
+              {isFav ? ' ★' : ''}
+            </button>
+          );
+        })}
+      </div>
 
       <div className="flex-1 overflow-y-auto">
         {(listError || usersError) && (
@@ -188,7 +186,7 @@ export function SearchPage() {
           </div>
         ) : !listLoading && !listError ? (
           <p className="py-16 text-center text-sm text-ig-muted">
-            {isTextSearch ? 'Натиҷа ёфт нашуд — номи категорияро санҷед' : 'Видё нест — категорияи дигар интихоб кунед'}
+            {isTextSearch ? 'Натиҷа ёфт нашуд' : 'Видё нест — категорияи дигар интихоб кунед'}
           </p>
         ) : null}
       </div>

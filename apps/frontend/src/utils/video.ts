@@ -17,6 +17,7 @@ export function toVideo(partial: Partial<Video> & { id: string; playUrl?: string
     url: playUrl,
     playUrl,
     thumbnailUrl: partial.thumbnailUrl ?? `https://picsum.photos/seed/reel${partial.id}/720/1280`,
+    title: partial.title ?? partial.caption ?? '',
     format: partial.format ?? 'reels',
     category: partial.category ?? 'entertainment',
     hashtags: partial.hashtags ?? [],

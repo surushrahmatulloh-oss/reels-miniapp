@@ -183,8 +183,10 @@ export async function searchUsers(q: string) {
   }>;
 }
 
-export async function searchVideos(q: string) {
-  const { data } = await api.get('/search/videos', { params: { q } });
+export async function searchVideos(q: string, category?: string) {
+  const { data } = await api.get('/search/videos', {
+    params: { q: q || undefined, category: category || undefined },
+  });
   return data.videos as Video[];
 }
 

@@ -16,7 +16,7 @@ import {
   type MemoryVideo,
 } from '../store/fallback.js';
 import { savePersistedStore } from '../persist.js';
-import { resolveCategoryQuery, isFormatQuery } from '../utils/categorySearch.js';
+import { resolveCategoryQuery, isFormatQuery, expandCategoryIds } from '../utils/categorySearch.js';
 import { urlHasAudio } from '../data/audioMp4Pool.js';
 
 /** Stable feed order per user — pagination without re-shuffle */
@@ -191,7 +191,11 @@ function enrichVideo(v: MemoryVideo, userId: string) {
 function matchesQuery(v: MemoryVideo, q: string): boolean {
   const lower = q.toLowerCase();
   const categoryId = resolveCategoryQuery(q);
-  if (categoryId) return v.category === categoryId;
+  if (categoryId) {
+    const cats = expandCategoryIds([categoryId]);
+    if (cats.includes(v.category)) return true;
+    if (v.hashtags.some((h) => cats.includes(h.toLowerCase()))) return true;
+  }
   if (isFormatQuery(q)) return v.format === q.toLowerCase();
   return (
     v.caption.toLowerCase().includes(lower) ||

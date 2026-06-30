@@ -6,27 +6,9 @@ import { cacheGet, cacheSet } from '../redis.js';
 import type { VideoFormat } from '../types/index.js';
 import { normalizePlaybackUrl } from '../data/workingMp4Pool.js';
 import { urlHasAudio } from '../data/audioMp4Pool.js';
+import { CATEGORY_IDS, expandCategoryIds } from '../data/categories.js';
 
-const CATEGORIES = [
-  'music',
-  'travel',
-  'food',
-  'sport',
-  'tech',
-  'comedy',
-  'fashion',
-  'nature',
-  'education',
-  'dance',
-  'cooking',
-  'fitness',
-  'animals',
-  'art',
-  'gaming',
-  'news',
-  'health',
-  'business',
-];
+const CATEGORIES = CATEGORY_IDS;
 
 export { CATEGORIES };
 
@@ -84,8 +66,9 @@ export async function buildFeed(params: {
   );
   if (cached) return cached;
 
-  const preferredCategories =
-    params.categories.length > 0 ? params.categories : CATEGORIES.slice(0, 6);
+  const preferredCategories = expandCategoryIds(
+    params.categories.length > 0 ? params.categories : CATEGORIES.slice(0, 6),
+  );
 
   const watched = await getWatchedIds(params.userId);
   for (const id of params.excludeIds ?? []) {
@@ -171,6 +154,7 @@ export async function enrichVideos(
       url: playbackUrl,
       playUrl: `/api/media/${id}.mp4`,
       thumbnailUrl: video.thumbnailUrl,
+      title: video.title,
       title: video.title,
       format: video.format,
       category: video.category,
