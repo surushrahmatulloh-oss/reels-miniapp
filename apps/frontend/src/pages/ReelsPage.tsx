@@ -7,7 +7,7 @@ import { ReelsPlayer } from '@/components/ReelsPlayer';
 import { BottomNav } from '@/components/BottomNav';
 import { FeedSkeleton } from '@/components/Skeleton';
 
-const APP_VERSION = '4.8.2';
+const APP_VERSION = '4.9.0';
 
 export function ReelsPage() {
   useSocket();
@@ -19,6 +19,8 @@ export function ReelsPage() {
     const prev = localStorage.getItem('reels_app_version');
     if (prev !== APP_VERSION) {
       localStorage.setItem('reels_app_version', APP_VERSION);
+      localStorage.removeItem('reels:muted');
+      localStorage.removeItem('reels:soundUnlocked');
       useFeedStore.getState().setVideos([]);
       useFeedStore.getState().setCurrentIndex(0);
       useFeedStore.getState().setPagination(null, true);
